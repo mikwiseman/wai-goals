@@ -1,0 +1,19 @@
+WaiGoals helps you keep the goals that matter — like "stop working at 7 PM" or "post once a week" — with a single tap a day.
+
+Minimal by design, satisfying to use, and completely private.
+
+WHY WAIGOALS
+• One-tap tracking. Open the app, tap your goals, done in seconds.
+• Flexible schedules. Daily, specific weekdays (Mon/Wed/Fri), or a number of times per week.
+• Forgiving streaks. Your current and best streak, side by side. Only the days you're due count — an unfinished today is grace, not a broken streak.
+• See your progress. A clean weekly ring, a contribution-style heatmap, a 12-week trend, and your completion rate.
+• Gentle reminders. Pick a time per goal; a quiet nudge keeps you on track.
+• Milestones worth celebrating. A little confetti when you reach 7, 30, or 100 days.
+
+PRIVATE BY DEFAULT
+Everything lives on your device. No account, no cloud, no tracking — just your goals.
+
+DESIGNED FOR TODAY'S iPHONE
+Built natively with a clean, modern interface, full Dark Mode, Dynamic Type, and VoiceOver support.
+
+Set a goal. Tap it each day. Watch the streak grow.

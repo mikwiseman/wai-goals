@@ -32,3 +32,6 @@ fastlane/api_key.json
 fastlane/.env*
 fastlane/metadata/review_information/
 
+
+# Python virtual environment
+.venv/

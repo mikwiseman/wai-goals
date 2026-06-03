@@ -1,0 +1,7 @@
+The first release of WaiGoals.
+
+• Track daily and weekly goals with one tap
+• Forgiving current + best streaks
+• Progress heatmap, 12-week trend, and completion rate
+• Gentle per-goal reminders
+• Private and on-device — no account needed
