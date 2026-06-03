@@ -21,3 +21,14 @@ WaiGoals.xcodeproj/
 .swiftpm/
 .build/
 Package.resolved
+
+# fastlane — keep metadata text, but never commit secrets, PII, or noise
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/README.md
+fastlane/test_output/
+fastlane/AuthKey_*.p8
+fastlane/api_key.json
+fastlane/.env*
+fastlane/metadata/review_information/
+
