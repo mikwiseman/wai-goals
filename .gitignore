@@ -1,0 +1,23 @@
+# macOS
+.DS_Store
+
+# Xcode
+DerivedData/
+build/
+*.xcuserstate
+xcuserdata/
+*.xcscmblueprint
+*.xccheckout
+*.moved-aside
+*.hmap
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+# XcodeGen — project.yml is the source of truth; the .xcodeproj is generated
+WaiGoals.xcodeproj/
+
+# Swift Package Manager
+.swiftpm/
+.build/
+Package.resolved
