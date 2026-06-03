@@ -37,6 +37,16 @@ platform :ios do
     UI.message(app ? "APP_EXISTS id=#{app.id} name=#{app.name}" : "APP_NOT_FOUND")
   end
 
+  desc "List builds with processing + compliance state"
+  lane :builds_status do
+    asc_api_key
+    app = Spaceship::ConnectAPI::App.find("is.waiwai.goals")
+    app.get_builds(includes: "preReleaseVersion").each do |b|
+      UI.message("BUILD ver=#{b.version} train=#{b.pre_release_version&.version} " \
+                 "processing=#{b.processing_state} encryption=#{b.uses_non_exempt_encryption.inspect}")
+    end
+  end
+
   desc "Upload the most recent archive's IPA to TestFlight"
   lane :beta do
     upload_to_testflight(
