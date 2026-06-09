@@ -3,8 +3,9 @@ import ImageIO
 import UniformTypeIdentifiers
 import Foundation
 
-// Renders the 1024×1024 app icon: an indigo→violet gradient with a bold,
-// upward-rising white checkmark. Usage: swift MakeIcon.swift <output.png>
+// Renders the 1024×1024 app icon: an indigo→violet gradient with two bold
+// white checkmarks that meet at the centre and together read as a rising "W"
+// — a nod to goals (✓✓) and to Wai (W). Usage: swift MakeIcon.swift <output.png>
 
 let size = 1024
 let colorSpace = CGColorSpace(name: CGColorSpace.sRGB)!
@@ -33,16 +34,26 @@ let glow = CGGradient(colorsSpace: colorSpace, colors: glowColors, locations: [0
 ctx.drawRadialGradient(glow, startCenter: CGPoint(x: s/2, y: s/2), startRadius: 0,
                        endCenter: CGPoint(x: s/2, y: s/2), endRadius: s * 0.52, options: [])
 
-// Bold rising checkmark (CG origin is bottom-left)
+// Two bold checkmarks meeting at the centre → a rising "W" (CG origin is
+// bottom-left). The left tick's long arm and the right tick's short arm kiss
+// in the middle, so the mark reads as both ✓✓ and W.
 ctx.setStrokeColor(CGColor(red: 1, green: 1, blue: 1, alpha: 1))
-ctx.setLineWidth(112)
+ctx.setLineWidth(94)
 ctx.setLineCap(.round)
 ctx.setLineJoin(.round)
-ctx.beginPath()
-ctx.move(to: CGPoint(x: 300, y: 545))
-ctx.addLine(to: CGPoint(x: 455, y: 395))
-ctx.addLine(to: CGPoint(x: 740, y: 700))
-ctx.strokePath()
+
+func tick(_ a: CGPoint, _ b: CGPoint, _ c: CGPoint) {
+    ctx.beginPath()
+    ctx.move(to: a)
+    ctx.addLine(to: b)
+    ctx.addLine(to: c)
+    ctx.strokePath()
+}
+
+// Left checkmark: short arm down to the valley, long arm up to the centre.
+tick(CGPoint(x: 202, y: 522), CGPoint(x: 322, y: 397), CGPoint(x: 517, y: 627))
+// Right checkmark: congruent, shifted right so it starts where the first peaks.
+tick(CGPoint(x: 507, y: 522), CGPoint(x: 627, y: 397), CGPoint(x: 822, y: 627))
 
 guard let image = ctx.makeImage() else { fatalError("Could not render image") }
 let outPath = CommandLine.arguments.count > 1 ? CommandLine.arguments[1] : "icon-1024.png"
