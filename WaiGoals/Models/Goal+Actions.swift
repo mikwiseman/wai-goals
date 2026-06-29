@@ -2,6 +2,35 @@ import Foundation
 import SwiftData
 
 extension Goal {
+    /// Creates or updates the daily intention for `date`.
+    ///
+    /// The operation is an upsert because a user may approve a morning
+    /// intention, then choose a sharper cue later without creating duplicates.
+    @discardableResult
+    func approveIntention(
+        on date: Date = .now,
+        cue: IntentionCue,
+        context: ModelContext,
+        calendar: Calendar = .current
+    ) -> Intention {
+        let day = calendar.startOfDay(for: date)
+
+        if let existing = intention(on: day, calendar: calendar) {
+            existing.cue = cue
+            existing.approvedAt = .now
+            context.saveOrLog()
+            return existing
+        }
+
+        let intention = Intention(day: day, cue: cue, goal: self)
+        context.insert(intention)
+        if !intentions.contains(where: { $0.id == intention.id }) {
+            intentions.append(intention)
+        }
+        context.saveOrLog()
+        return intention
+    }
+
     /// Toggles completion for `date` (default: today).
     ///
     /// Returns the new **current streak** if the goal just became completed for

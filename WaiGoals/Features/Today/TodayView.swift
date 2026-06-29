@@ -10,6 +10,7 @@ struct TodayView: View {
     @State private var showingSettings = false
     @State private var milestone: MilestoneInfo?
     @State private var deepLinkedGoal: Goal?
+    @State private var intentionGoal: Goal?
     @State private var didHandleLaunch = false
 
     private let calendar = Calendar.current
@@ -31,6 +32,14 @@ struct TodayView: View {
 
     private var doneCount: Int {
         dueGoals.filter { $0.isCompleted(on: today, calendar: calendar) }.count
+    }
+
+    private var pendingGoals: [Goal] {
+        dueGoals.filter { !$0.isCompleted(on: today, calendar: calendar) }
+    }
+
+    private var intendedPendingCount: Int {
+        pendingGoals.filter { $0.hasIntention(on: today, calendar: calendar) }.count
     }
 
     var body: some View {
@@ -67,6 +76,9 @@ struct TodayView: View {
             }
             .sheet(isPresented: $showingEditor) { GoalEditorView() }
             .sheet(isPresented: $showingSettings) { SettingsView() }
+            .sheet(item: $intentionGoal) { goal in
+                IntentionApprovalSheet(goal: goal, date: today, calendar: calendar)
+            }
             .navigationDestination(item: $deepLinkedGoal) { GoalDetailView(goal: $0) }
             .onChange(of: coordinator.routeGoalID) { _, id in
                 guard let id, let goal = allGoals.first(where: { $0.id == id }) else { return }
@@ -109,11 +121,14 @@ struct TodayView: View {
 
                 LazyVStack(spacing: Theme.Spacing.m) {
                     ForEach(sortedDue) { goal in
+                        let intention = goal.intention(on: today, calendar: calendar)
                         TodayGoalRow(
                             goal: goal,
                             isDone: goal.isCompleted(on: today, calendar: calendar),
+                            intentionCue: intention?.cue,
                             calendar: calendar,
                             onToggle: { toggle(goal) },
+                            onIntend: { intentionGoal = goal },
                             onOpen: { deepLinkedGoal = goal }
                         )
                     }
@@ -129,6 +144,8 @@ struct TodayView: View {
         let total = dueGoals.count
         let fraction = total == 0 ? 0 : Double(doneCount) / Double(total)
         let allDone = total > 0 && doneCount == total
+        let pending = pendingGoals.count
+        let intended = intendedPendingCount
         return HStack(spacing: Theme.Spacing.xl) {
             ZStack {
                 ProgressRing(fraction: fraction, lineWidth: 11)
@@ -151,14 +168,12 @@ struct TodayView: View {
             }
             .accessibilityElement(children: .ignore)
             .accessibilityLabel("Today's progress")
-            .accessibilityValue(allDone ? "All \(total) goals complete" : "\(doneCount) of \(total) goals complete")
+            .accessibilityValue(heroAccessibilityValue(total: total, allDone: allDone,
+                                                       pending: pending, intended: intended))
             VStack(alignment: .leading, spacing: 4) {
-                Text(allDone ? "All done for today" : "Keep it going")
+                Text(heroTitle(total: total, allDone: allDone, pending: pending, intended: intended))
                     .font(.title3.weight(.semibold))
-                Text(allDone
-                     ? "Every goal checked off. Nice work."
-                     : (total == 0 ? "Nothing scheduled today — enjoy it."
-                        : "\(total - doneCount) left to check off today."))
+                Text(heroMessage(total: total, allDone: allDone, pending: pending, intended: intended))
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -168,6 +183,32 @@ struct TodayView: View {
         .padding(Theme.Spacing.xl)
         .frame(maxWidth: .infinity)
         .card(cornerRadius: Theme.Radius.hero)
+    }
+
+    private func heroTitle(total: Int, allDone: Bool, pending: Int, intended: Int) -> String {
+        if allDone { return "All done for today" }
+        if total == 0 { return "Nothing scheduled today" }
+        if pending > 0 && intended == pending { return "Today is committed" }
+        if intended > 0 { return "Intention in motion" }
+        return "Choose today’s intention"
+    }
+
+    private func heroMessage(total: Int, allDone: Bool, pending: Int, intended: Int) -> String {
+        if allDone { return "Every goal checked off. Nice work." }
+        if total == 0 { return "Enjoy the open space." }
+        if pending > 0 && intended == pending {
+            return "All \(pending) pending \(pending == 1 ? "goal has" : "goals have") a cue."
+        }
+        if intended > 0 {
+            return "\(intended) of \(pending) pending \(pending == 1 ? "goal" : "goals") committed."
+        }
+        return "\(pending) \(pending == 1 ? "goal is" : "goals are") waiting for a cue."
+    }
+
+    private func heroAccessibilityValue(total: Int, allDone: Bool, pending: Int, intended: Int) -> String {
+        if allDone { return "All \(total) goals complete" }
+        if total == 0 { return "No goals scheduled today" }
+        return "\(doneCount) of \(total) goals complete, \(intended) of \(pending) pending goals have intentions"
     }
 
     private func toggle(_ goal: Goal) {

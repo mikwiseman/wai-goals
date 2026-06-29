@@ -11,6 +11,7 @@ struct GoalDetailView: View {
     @State private var showingEditor = false
     @State private var milestone: MilestoneInfo?
     @State private var showingDeleteConfirm = false
+    @State private var showingIntention = false
 
     private let calendar = Calendar.current
     private var today: Date { calendar.startOfDay(for: .now) }
@@ -27,6 +28,7 @@ struct GoalDetailView: View {
                     header(tint: tint)
                     if goal.schedule.isScheduled(on: today, calendar: calendar) {
                         markTodayButton(tint: tint)
+                        intentionCard(tint: tint)
                     }
                     streakCard(streak: streak, tint: tint)
                     weekCard(completed: completed, tint: tint)
@@ -67,6 +69,9 @@ struct GoalDetailView: View {
         }
         .sheet(isPresented: $showingEditor) {
             GoalEditorView(goal: goal)
+        }
+        .sheet(isPresented: $showingIntention) {
+            IntentionApprovalSheet(goal: goal, date: today, calendar: calendar)
         }
         .overlay {
             if let milestone {
@@ -110,6 +115,40 @@ struct GoalDetailView: View {
         .tint(tint)
         .controlSize(.large)
         .sensoryFeedback(trigger: isDone) { _, now in now ? .success : .impact(weight: .light) }
+    }
+
+    private func intentionCard(tint: Color) -> some View {
+        let intention = goal.intention(on: today, calendar: calendar)
+        return Button {
+            showingIntention = true
+        } label: {
+            HStack(alignment: .top, spacing: Theme.Spacing.m) {
+                Image(systemName: intention == nil ? "target" : "checkmark.seal.fill")
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(tint)
+                    .frame(width: 28)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(intention == nil ? "Approve intention" : "Intention approved")
+                        .font(.headline)
+                        .foregroundStyle(.primary)
+                    Text(intention?.cue.planLine(for: goal.title) ?? "No cue approved for today.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.leading)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.tertiary)
+            }
+            .padding(Theme.Spacing.l)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .buttonStyle(.plain)
+        .card()
+        .accessibilityLabel(intention == nil ? "Approve intention for \(goal.title)" :
+                            "Change intention for \(goal.title)")
     }
 
     private func streakCard(streak: StreakResult, tint: Color) -> some View {

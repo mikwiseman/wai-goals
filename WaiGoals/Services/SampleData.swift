@@ -13,6 +13,7 @@ enum SampleData {
     }
 
     static func wipe(_ context: ModelContext) {
+        try? context.delete(model: Intention.self)
         try? context.delete(model: Completion.self)
         try? context.delete(model: Goal.self)
         context.saveOrLog()
@@ -48,6 +49,7 @@ enum SampleData {
                                 Schedule(type: .timesPerWeek, timesPerWeek: 3), reminderHour: 11)
         addDates(telegram, weeklyDates(weeksAgo: 3, perWeek: 3, calendar: calendar), context)
         addDates(telegram, currentWeekDates(count: 1, calendar: calendar), context) // 1/3 this week
+        addIntention(telegram, .firstBreak, context, calendar)
 
         // 3. Specific days (Mon/Wed/Fri).
         let workout = makeGoal("Morning workout", "figure.run", .green,
@@ -59,6 +61,7 @@ enum SampleData {
         // 4. Daily, big streak but undone today (grace) — actionable now.
         let read = makeGoal("Read 20 pages", "book.fill", .amber, .daily, reminderHour: 21)
         addDayOffsets(read, Array(1...34), context, calendar) // 34-day streak, today pending
+        addIntention(read, .beforeBed, context, calendar)
 
         // 5. Daily, just hit a milestone-ish streak, done today.
         let meditate = makeGoal("Meditate 10 min", "figure.mind.and.body", .teal, .daily, reminderHour: 8)
@@ -67,6 +70,7 @@ enum SampleData {
         // 6. Daily, recovering streak (a recent miss), undone today.
         let phone = makeGoal("No phone after midnight", "iphone.slash", .violet, .daily)
         addDayOffsets(phone, [1, 2, 3, 5, 6, 7, 8, 9, 10], context, calendar) // missed day 4
+        addIntention(phone, .evening, context, calendar)
 
         context.saveOrLog()
     }
@@ -86,6 +90,12 @@ enum SampleData {
             let completion = Completion(day: calendar.startOfDay(for: date), goal: goal)
             context.insert(completion)
         }
+    }
+
+    private static func addIntention(_ goal: Goal, _ cue: IntentionCue,
+                                     _ context: ModelContext, _ calendar: Calendar) {
+        let intention = Intention(day: calendar.startOfDay(for: .now), cue: cue, goal: goal)
+        context.insert(intention)
     }
 
     /// Day offsets within `within` days whose weekday is in `weekdays`.

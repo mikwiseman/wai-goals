@@ -18,6 +18,7 @@ A minimal, native iOS app for tracking the goals and habits that matter — *“
 ## Features
 
 - **Flexible scheduling** — each goal repeats **daily**, on **specific weekdays** (e.g. Mon/Wed/Fri), or **N times per week**.
+- **Daily intentions** — at the start of the day, approve a lightweight if-then cue for each pending goal before marking it complete.
 - **One-tap completion** — a satisfying check with a spring animation and haptic feedback. The core action takes under a second.
 - **Forgiving, schedule-aware streaks** — current **and** best streak. Only the days you’re actually due count, an unfinished *today* is grace (never a broken streak), and your best is never erased by a single miss.
 - **Statistics** — a per-week completion ring, a GitHub-style **heatmap**, a 12-week **trend chart** (Swift Charts), completion rate, and a current-streak leaderboard.
@@ -36,7 +37,7 @@ A minimal, native iOS app for tracking the goals and habits that matter — *“
 
 Modern SwiftUI “MV”, with logic kept out of the views so it’s trivially testable:
 
-- **Models** (`@Model`) — `Goal`, `Completion`. Enum-like fields are stored as primitives and bridged to value types to avoid SwiftData’s Codable-enum pitfalls.
+- **Models** (`@Model`) — `Goal`, `Completion`, `Intention`. Enum-like fields are stored as primitives and bridged to value types to avoid SwiftData’s Codable-enum pitfalls.
 - **Logic** (pure value types, fully unit-tested) — `Schedule`, `Weekday`, `StreakCalculator`, `StatsCalculator`. No SwiftData, no UIKit — just dates in, numbers out.
 - **Services** — `NotificationScheduler` (`@Observable`, syncs reminders on every change), `NotificationCoordinator` (foreground presentation + tap routing), `SampleData`, `Haptics`.
 - **Design System** — `Theme`, `AccentToken`, and reusable components (progress ring, streak badge, completion button, heatmap day-dot, milestone overlay, confetti).
@@ -45,7 +46,7 @@ Modern SwiftUI “MV”, with logic kept out of the views so it’s trivially te
 ```
 WaiGoals/
   App/            WaiGoalsApp.swift · RootView.swift
-  Models/         Goal · Completion · Schedule · Weekday · Goal+Actions
+  Models/         Goal · Completion · Intention · Schedule · Weekday · Goal+Actions
   Logic/          StreakCalculator · StatsCalculator
   Services/       NotificationScheduler · NotificationCoordinator · AppSettings · Haptics · SampleData · AppLaunch · ModelContext+Persistence
   DesignSystem/   Theme · AccentToken · Components

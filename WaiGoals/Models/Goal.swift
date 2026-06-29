@@ -31,6 +31,9 @@ final class Goal {
     @Relationship(deleteRule: .cascade, inverse: \Completion.goal)
     var completions: [Completion] = []
 
+    @Relationship(deleteRule: .cascade, inverse: \Intention.goal)
+    var intentions: [Intention] = []
+
     init(
         id: UUID = UUID(),
         title: String,
@@ -56,6 +59,7 @@ final class Goal {
         self.createdAt = createdAt
         self.isArchived = isArchived
         self.completions = []
+        self.intentions = []
     }
 }
 
@@ -91,6 +95,15 @@ extension Goal {
     func isCompleted(on date: Date, calendar: Calendar = .current) -> Bool {
         let target = calendar.startOfDay(for: date)
         return completions.contains { calendar.isDate($0.day, inSameDayAs: target) }
+    }
+
+    func intention(on date: Date, calendar: Calendar = .current) -> Intention? {
+        let target = calendar.startOfDay(for: date)
+        return intentions.first { calendar.isDate($0.day, inSameDayAs: target) }
+    }
+
+    func hasIntention(on date: Date, calendar: Calendar = .current) -> Bool {
+        intention(on: date, calendar: calendar) != nil
     }
 
     /// Whether the goal should appear in the "Today" list: due today and, for
