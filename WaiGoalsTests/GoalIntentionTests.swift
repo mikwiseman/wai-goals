@@ -8,8 +8,8 @@ import SwiftData
 struct GoalIntentionTests {
     let cal = Cal.make()
 
-    @Test("Approving an intention creates one record per local day and updates its cue")
-    func approveCreatesDailyRecordAndUpdatesCue() throws {
+    @Test("Approving an intention creates one record per local day")
+    func approveCreatesDailyRecord() throws {
         let context = try makeContext()
         let goal = Goal(title: "Read 20 pages")
         context.insert(goal)
@@ -19,16 +19,19 @@ struct GoalIntentionTests {
 
         #expect(!goal.hasIntention(on: today, calendar: cal))
 
-        let first = goal.approveIntention(on: today, cue: .evening, context: context, calendar: cal)
-        #expect(first.cue == .evening)
+        let first = goal.approveIntention(on: today, context: context, calendar: cal)
         #expect(goal.hasIntention(on: today, calendar: cal))
         #expect(!goal.hasIntention(on: tomorrow, calendar: cal))
         #expect(goal.intentions.count == 1)
 
-        let updated = goal.approveIntention(on: today, cue: .beforeBed, context: context, calendar: cal)
-        #expect(updated.id == first.id)
-        #expect(updated.cue == .beforeBed)
+        let second = goal.approveIntention(on: today, context: context, calendar: cal)
+        #expect(second.id == first.id)
         #expect(goal.intentions.count == 1)
+    }
+
+    @Test("Pledge text is direct")
+    func pledgeText() {
+        #expect(Intention.pledgeText == "I hereby commit to doing my best to complete this goal today.")
     }
 
     @Test("Intending today does not mark the goal complete")
@@ -38,7 +41,7 @@ struct GoalIntentionTests {
         context.insert(goal)
 
         let today = Cal.day(2025, 1, 15, in: cal)
-        _ = goal.approveIntention(on: today, cue: .evening, context: context, calendar: cal)
+        _ = goal.approveIntention(on: today, context: context, calendar: cal)
 
         #expect(goal.hasIntention(on: today, calendar: cal))
         #expect(!goal.isCompleted(on: today, calendar: cal))
@@ -52,7 +55,7 @@ struct GoalIntentionTests {
         context.insert(goal)
 
         let today = Cal.day(2025, 1, 15, in: cal)
-        _ = goal.approveIntention(on: today, cue: .firstBreak, context: context, calendar: cal)
+        _ = goal.approveIntention(on: today, context: context, calendar: cal)
 
         let streak = goal.toggleCompletion(on: today, context: context, calendar: cal)
 

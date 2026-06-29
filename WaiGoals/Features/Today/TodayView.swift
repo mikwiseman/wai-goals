@@ -121,11 +121,11 @@ struct TodayView: View {
 
                 LazyVStack(spacing: Theme.Spacing.m) {
                     ForEach(sortedDue) { goal in
-                        let intention = goal.intention(on: today, calendar: calendar)
+                        let hasIntention = goal.hasIntention(on: today, calendar: calendar)
                         TodayGoalRow(
                             goal: goal,
                             isDone: goal.isCompleted(on: today, calendar: calendar),
-                            intentionCue: intention?.cue,
+                            hasIntention: hasIntention,
                             calendar: calendar,
                             onToggle: { toggle(goal) },
                             onIntend: { intentionGoal = goal },
@@ -197,12 +197,12 @@ struct TodayView: View {
         if allDone { return "Every goal checked off. Nice work." }
         if total == 0 { return "Enjoy the open space." }
         if pending > 0 && intended == pending {
-            return "All \(pending) pending \(pending == 1 ? "goal has" : "goals have") a cue."
+            return "All \(pending) pending \(pending == 1 ? "goal is" : "goals are") committed."
         }
         if intended > 0 {
             return "\(intended) of \(pending) pending \(pending == 1 ? "goal" : "goals") committed."
         }
-        return "\(pending) \(pending == 1 ? "goal is" : "goals are") waiting for a cue."
+        return "\(pending) \(pending == 1 ? "goal is" : "goals are") waiting for approval."
     }
 
     private func heroAccessibilityValue(total: Int, allDone: Bool, pending: Int, intended: Int) -> String {

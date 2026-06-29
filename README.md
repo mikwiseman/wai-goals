@@ -18,7 +18,7 @@ A minimal, native iOS app for tracking the goals and habits that matter — *“
 ## Features
 
 - **Flexible scheduling** — each goal repeats **daily**, on **specific weekdays** (e.g. Mon/Wed/Fri), or **N times per week**.
-- **Daily intentions** — at the start of the day, approve a lightweight if-then cue for each pending goal before marking it complete.
+- **Daily intentions** — at the start of the day, approve a lightweight commitment statement for each pending goal before marking it complete.
 - **One-tap completion** — a satisfying check with a spring animation and haptic feedback. The core action takes under a second.
 - **Forgiving, schedule-aware streaks** — current **and** best streak. Only the days you’re actually due count, an unfinished *today* is grace (never a broken streak), and your best is never erased by a single miss.
 - **Statistics** — a per-week completion ring, a GitHub-style **heatmap**, a 12-week **trend chart** (Swift Charts), completion rate, and a current-streak leaderboard.

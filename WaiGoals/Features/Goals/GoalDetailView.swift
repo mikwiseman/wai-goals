@@ -131,7 +131,7 @@ struct GoalDetailView: View {
                     Text(intention == nil ? "Approve intention" : "Intention approved")
                         .font(.headline)
                         .foregroundStyle(.primary)
-                    Text(intention?.cue.planLine(for: goal.title) ?? "No cue approved for today.")
+                    Text(Intention.pledgeText)
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.leading)
@@ -148,7 +148,7 @@ struct GoalDetailView: View {
         .buttonStyle(.plain)
         .card()
         .accessibilityLabel(intention == nil ? "Approve intention for \(goal.title)" :
-                            "Change intention for \(goal.title)")
+                            "Review intention for \(goal.title)")
     }
 
     private func streakCard(streak: StreakResult, tint: Color) -> some View {

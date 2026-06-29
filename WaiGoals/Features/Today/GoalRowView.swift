@@ -6,7 +6,7 @@ import SwiftUI
 struct TodayGoalRow: View {
     let goal: Goal
     let isDone: Bool
-    let intentionCue: IntentionCue?
+    let hasIntention: Bool
     var calendar: Calendar = .current
     let onToggle: () -> Void
     let onIntend: () -> Void
@@ -46,14 +46,14 @@ struct TodayGoalRow: View {
                 .accessibilityLabel(accessibilityLabel(streak: streak))
                 .accessibilityHint("Opens details")
 
-                if isDone, let intentionCue {
-                    Label("Intended: \(intentionCue.title)", systemImage: "checkmark.seal.fill")
+                if isDone, hasIntention {
+                    Label("Intention approved", systemImage: "checkmark.seal.fill")
                         .font(.caption.weight(.medium))
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                 } else if !isDone {
                     Button(action: onIntend) {
-                        Label(intentionTitle, systemImage: intentionCue == nil ? "target" : "checkmark.seal.fill")
+                        Label(intentionTitle, systemImage: hasIntention ? "checkmark.seal.fill" : "target")
                             .font(.caption.weight(.semibold))
                             .lineLimit(1)
                             .minimumScaleFactor(0.8)
@@ -61,11 +61,11 @@ struct TodayGoalRow: View {
                             .frame(minHeight: 34)
                             .background(
                                 Capsule(style: .continuous)
-                                    .fill(intentionCue == nil ? tint.opacity(0.10) : tint.opacity(0.16))
+                                    .fill(hasIntention ? tint.opacity(0.16) : tint.opacity(0.10))
                             )
                             .overlay(
                                 Capsule(style: .continuous)
-                                    .strokeBorder(tint.opacity(intentionCue == nil ? 0.28 : 0.55), lineWidth: 1)
+                                    .strokeBorder(tint.opacity(hasIntention ? 0.55 : 0.28), lineWidth: 1)
                             )
                     }
                     .buttonStyle(.plain)
@@ -79,19 +79,17 @@ struct TodayGoalRow: View {
     }
 
     private var intentionTitle: String {
-        guard let intentionCue else { return "Intend today" }
-        return "Intended: \(intentionCue.title)"
+        hasIntention ? "Intention approved" : "Approve intention"
     }
 
     private var intentionAccessibilityLabel: String {
-        guard let intentionCue else { return "Approve intention for \(goal.title)" }
-        return "Change intention for \(goal.title), currently \(intentionCue.title)"
+        hasIntention ? "Review intention for \(goal.title)" : "Approve intention for \(goal.title)"
     }
 
     private func accessibilityLabel(streak: StreakResult) -> String {
         var parts = [goal.title, subtitle]
-        if let intentionCue {
-            parts.append("Intended for \(intentionCue.title)")
+        if hasIntention {
+            parts.append("Intention approved")
         }
         if streak.current > 0 {
             parts.append("\(streak.current) \(streak.unit.label(for: streak.current)) streak")
