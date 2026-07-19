@@ -16,7 +16,7 @@ struct TodayGoalRow: View {
         let tint = goal.accent.color
         let streak = goal.streak(asOf: .now, calendar: calendar)
         HStack(alignment: .top, spacing: Theme.Spacing.m) {
-            CompletionButton(isDone: isDone, symbol: goal.symbol, tint: tint, size: 46, action: onToggle)
+            CompletionButton(isDone: isDone, symbol: goal.symbol, tint: tint, size: 44, action: onToggle)
 
             VStack(alignment: .leading, spacing: Theme.Spacing.s) {
                 Button(action: onOpen) {
@@ -57,25 +57,17 @@ struct TodayGoalRow: View {
                             .font(.caption.weight(.semibold))
                             .lineLimit(1)
                             .minimumScaleFactor(0.8)
-                            .padding(.horizontal, Theme.Spacing.m)
-                            .frame(minHeight: 34)
-                            .background(
-                                Capsule(style: .continuous)
-                                    .fill(hasIntention ? tint.opacity(0.16) : tint.opacity(0.10))
-                            )
-                            .overlay(
-                                Capsule(style: .continuous)
-                                    .strokeBorder(tint.opacity(hasIntention ? 0.55 : 0.28), lineWidth: 1)
-                            )
+                            .padding(.horizontal, Theme.Spacing.xxs)
                     }
-                    .buttonStyle(.plain)
+                    .waiGlassButton()
+                    .controlSize(.small)
+                    .tint(hasIntention ? tint : .secondary)
                     .foregroundStyle(tint)
                     .accessibilityLabel(intentionAccessibilityLabel)
                 }
             }
         }
-        .padding(Theme.Spacing.l)
-        .card()
+        .padding(.vertical, Theme.Spacing.s)
     }
 
     private var intentionTitle: String {

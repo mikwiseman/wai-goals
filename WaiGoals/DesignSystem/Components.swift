@@ -28,20 +28,62 @@ enum Milestone {
 
 // MARK: - Goal icon
 
+struct GoalJourneyArtwork: View {
+    var size: CGFloat = 88
+
+    var body: some View {
+        Image("GoalJourney")
+            .resizable()
+            .scaledToFit()
+            .frame(width: size, height: size)
+            .clipShape(RoundedRectangle(cornerRadius: size * 0.25, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: size * 0.25, style: .continuous)
+                    .strokeBorder(.white.opacity(0.78), lineWidth: 0.75)
+            }
+            .accessibilityHidden(true)
+    }
+}
+
 struct GoalIcon: View {
     let symbol: String
     let tint: Color
     var size: CGFloat = 40
 
     var body: some View {
-        RoundedRectangle(cornerRadius: size * 0.28, style: .continuous)
-            .fill(tint.opacity(0.16))
-            .frame(width: size, height: size)
-            .overlay(
-                Image(systemName: symbol)
-                    .font(.system(size: size * 0.46, weight: .semibold))
-                    .foregroundStyle(tint)
-            )
+        ZStack {
+            RoundedRectangle(cornerRadius: size * 0.28, style: .continuous)
+                .fill(.thinMaterial)
+            RoundedRectangle(cornerRadius: size * 0.28, style: .continuous)
+                .fill(tint.opacity(0.11))
+            Image(systemName: symbol)
+                .font(.system(size: size * 0.46, weight: .semibold))
+                .foregroundStyle(tint)
+        }
+        .frame(width: size, height: size)
+        .overlay {
+            RoundedRectangle(cornerRadius: size * 0.28, style: .continuous)
+                .strokeBorder(.white.opacity(0.55), lineWidth: 0.75)
+        }
+    }
+}
+
+struct SectionHeading: View {
+    let title: String
+    var detail: String? = nil
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline) {
+            Text(title)
+                .font(.headline)
+            Spacer(minLength: Theme.Spacing.m)
+            if let detail {
+                Text(detail)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(.horizontal, Theme.Spacing.xxs)
     }
 }
 
@@ -291,7 +333,7 @@ struct MilestoneOverlay: View {
                         .multilineTextAlignment(.center)
                 }
                 Button("Keep going", action: onDismiss)
-                    .buttonStyle(.borderedProminent)
+                    .waiGlassButton(prominent: true)
                     .tint(tint)
                     .controlSize(.large)
             }
@@ -330,7 +372,7 @@ struct EmptyStateView: View {
             }
             if let actionTitle, let action {
                 Button(actionTitle, action: action)
-                    .buttonStyle(.borderedProminent)
+                    .waiGlassButton(prominent: true)
                     .tint(tint)
                     .controlSize(.large)
                     .padding(.top, Theme.Spacing.xs)
@@ -340,4 +382,3 @@ struct EmptyStateView: View {
         .frame(maxWidth: 360)
     }
 }
-

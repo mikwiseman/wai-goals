@@ -24,23 +24,19 @@ struct GoalDetailView: View {
         ZStack {
             AppBackground(tint: tint)
             ScrollView {
-                VStack(spacing: Theme.Spacing.l) {
+                VStack(spacing: Theme.Spacing.xxl) {
                     header(tint: tint)
                     if goal.schedule.isScheduled(on: today, calendar: calendar) {
                         markTodayButton(tint: tint)
                         intentionCard(tint: tint)
                     }
-                    streakCard(streak: streak, tint: tint)
-                    weekCard(completed: completed, tint: tint)
-                    heatmapCard(completed: completed, tint: tint)
-                    trendCard(completed: completed, tint: tint)
-                    statsCard(completed: completed, tint: tint)
-                    if goal.reminderEnabled, let time = goal.reminderTime {
-                        reminderCard(time: time, tint: tint)
-                    }
+                    momentumCard(streak: streak, completed: completed, tint: tint)
+                    historyCard(completed: completed, tint: tint)
+                    overviewCard(completed: completed, tint: tint)
                 }
-                .padding(Theme.Spacing.l)
-                .padding(.bottom, Theme.Spacing.xxl)
+                .padding(.horizontal, Theme.pagePadding)
+                .padding(.top, Theme.Spacing.s)
+                .padding(.bottom, Theme.Spacing.huge)
             }
             .scrollIndicators(.hidden)
         }
@@ -86,9 +82,9 @@ struct GoalDetailView: View {
     // MARK: - Sections
 
     private func header(tint: Color) -> some View {
-        VStack(spacing: Theme.Spacing.m) {
-            GoalIcon(symbol: goal.symbol, tint: tint, size: 72)
-            VStack(spacing: 4) {
+        VStack(spacing: Theme.Spacing.l) {
+            GoalIcon(symbol: goal.symbol, tint: tint, size: 84)
+            VStack(spacing: Theme.Spacing.xs) {
                 Text(goal.title)
                     .font(.title2.weight(.bold))
                     .multilineTextAlignment(.center)
@@ -98,7 +94,7 @@ struct GoalDetailView: View {
             }
         }
         .frame(maxWidth: .infinity)
-        .padding(.top, Theme.Spacing.s)
+        .padding(.vertical, Theme.Spacing.m)
     }
 
     private func markTodayButton(tint: Color) -> some View {
@@ -111,7 +107,7 @@ struct GoalDetailView: View {
                 .font(.headline)
                 .frame(maxWidth: .infinity)
         }
-        .buttonStyle(.borderedProminent)
+        .waiGlassButton(prominent: true)
         .tint(tint)
         .controlSize(.large)
         .sensoryFeedback(trigger: isDone) { _, now in now ? .success : .impact(weight: .light) }
@@ -151,17 +147,30 @@ struct GoalDetailView: View {
                             "Review intention for \(goal.title)")
     }
 
-    private func streakCard(streak: StreakResult, tint: Color) -> some View {
-        HStack(spacing: 0) {
-            statBlock(value: "\(streak.current)",
-                      label: "Current \(streak.unit.label(for: streak.current))",
-                      symbol: "flame.fill", tint: tint, prominent: true)
-            Divider().frame(height: 48)
-            statBlock(value: "\(streak.best)",
-                      label: "Best \(streak.unit.label(for: streak.best))",
-                      symbol: "trophy.fill", tint: tint, prominent: false)
+    private func momentumCard(streak: StreakResult, completed: Set<Date>, tint: Color) -> some View {
+        VStack(alignment: .leading, spacing: Theme.Spacing.xl) {
+            SectionHeading(title: "Momentum", detail: goal.schedule.summary(calendar: calendar))
+
+            HStack(spacing: 0) {
+                statBlock(value: "\(streak.current)",
+                          label: "Current \(streak.unit.label(for: streak.current))",
+                          symbol: "flame.fill", tint: tint, prominent: true)
+                Divider().frame(height: 52)
+                statBlock(value: "\(streak.best)",
+                          label: "Best \(streak.unit.label(for: streak.best))",
+                          symbol: "trophy.fill", tint: tint, prominent: false)
+            }
+
+            Divider()
+
+            VStack(alignment: .leading, spacing: Theme.Spacing.m) {
+                Text("This week")
+                    .font(.subheadline.weight(.semibold))
+                WeekStrip(schedule: goal.schedule, completedDays: completed,
+                          tint: tint, calendar: calendar)
+            }
         }
-        .padding(Theme.Spacing.l)
+        .padding(Theme.Spacing.xl)
         .frame(maxWidth: .infinity)
         .card()
     }
@@ -185,72 +194,59 @@ struct GoalDetailView: View {
         .frame(maxWidth: .infinity)
     }
 
-    private func weekCard(completed: Set<Date>, tint: Color) -> some View {
-        VStack(alignment: .leading, spacing: Theme.Spacing.m) {
-            Text("This week").font(.headline)
-            WeekStrip(schedule: goal.schedule, completedDays: completed, tint: tint, calendar: calendar)
-        }
-        .padding(Theme.Spacing.l)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .card()
-    }
-
-    private func heatmapCard(completed: Set<Date>, tint: Color) -> some View {
-        VStack(alignment: .leading, spacing: Theme.Spacing.m) {
-            Text("History").font(.headline)
+    private func historyCard(completed: Set<Date>, tint: Color) -> some View {
+        VStack(alignment: .leading, spacing: Theme.Spacing.l) {
+            SectionHeading(title: "The path behind you", detail: "18 weeks")
             HeatmapView(schedule: goal.schedule, completedDays: completed, tint: tint, calendar: calendar)
-            Text("Last 18 weeks")
-                .font(.caption2)
-                .foregroundStyle(.tertiary)
-        }
-        .padding(Theme.Spacing.l)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .card()
-    }
 
-    private func trendCard(completed: Set<Date>, tint: Color) -> some View {
-        VStack(alignment: .leading, spacing: Theme.Spacing.m) {
-            Text("Weekly trend").font(.headline)
+            Divider()
+
+            Text("Weekly rhythm")
+                .font(.subheadline.weight(.semibold))
             TrendChartView(
                 points: StatsCalculator.weeklyTrend(schedule: goal.schedule, completedDays: completed,
                                                     weeks: 12, asOf: today, calendar: calendar),
                 tint: tint
             )
         }
-        .padding(Theme.Spacing.l)
+        .padding(Theme.Spacing.xl)
         .frame(maxWidth: .infinity, alignment: .leading)
         .card()
     }
 
-    private func statsCard(completed: Set<Date>, tint: Color) -> some View {
+    private func overviewCard(completed: Set<Date>, tint: Color) -> some View {
         // Clamp the window to the goal's creation date so a brand-new goal isn't
         // shown an artificially low rate for days before it existed.
         let windowStart = calendar.date(byAdding: .day, value: -29, to: today) ?? today
         let from = max(windowStart, calendar.startOfDay(for: goal.createdAt))
         let rate = StatsCalculator.completionRate(schedule: goal.schedule, completedDays: completed,
                                                   from: from, to: today, calendar: calendar)
-        return HStack(spacing: 0) {
-            statBlock(value: rate.formatted(.percent.precision(.fractionLength(0))),
-                      label: "30-day rate", symbol: "chart.line.uptrend.xyaxis", tint: tint, prominent: false)
-            Divider().frame(height: 48)
-            statBlock(value: "\(goal.completions.count)",
-                      label: "Total done", symbol: "checkmark.seal.fill", tint: tint, prominent: false)
-        }
-        .padding(Theme.Spacing.l)
-        .frame(maxWidth: .infinity)
-        .card()
-    }
+        return VStack(spacing: Theme.Spacing.l) {
+            HStack(spacing: 0) {
+                statBlock(value: rate.formatted(.percent.precision(.fractionLength(0))),
+                          label: "30-day rate", symbol: "chart.line.uptrend.xyaxis",
+                          tint: tint, prominent: false)
+                Divider().frame(height: 52)
+                statBlock(value: "\(goal.completions.count)",
+                          label: "Total done", symbol: "checkmark.seal.fill",
+                          tint: tint, prominent: false)
+            }
 
-    private func reminderCard(time: Date, tint: Color) -> some View {
-        HStack(spacing: Theme.Spacing.m) {
-            Image(systemName: "bell.fill").foregroundStyle(tint)
-            Text("Reminder")
-            Spacer()
-            Text(time.formatted(date: .omitted, time: .shortened))
-                .foregroundStyle(.secondary)
+            if goal.reminderEnabled, let time = goal.reminderTime {
+                Divider()
+                HStack(spacing: Theme.Spacing.m) {
+                    Image(systemName: "bell.fill")
+                        .foregroundStyle(tint)
+                    Text("Reminder")
+                    Spacer()
+                    Text(time.formatted(date: .omitted, time: .shortened))
+                        .foregroundStyle(.secondary)
+                }
+                .font(.subheadline)
+            }
         }
-        .font(.subheadline)
-        .padding(Theme.Spacing.l)
+        .padding(Theme.Spacing.xl)
+        .frame(maxWidth: .infinity)
         .card()
     }
 

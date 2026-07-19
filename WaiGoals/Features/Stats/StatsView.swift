@@ -27,16 +27,34 @@ struct StatsView: View {
 
     private var content: some View {
         ScrollView {
-            VStack(spacing: Theme.Spacing.l) {
-                weekHero
-                tiles
-                trendCard
-                leaderboardCard
+            VStack(alignment: .leading, spacing: Theme.Spacing.xxl) {
+                summarySurface
+
+                VStack(alignment: .leading, spacing: Theme.Spacing.m) {
+                    SectionHeading(title: "Momentum", detail: "Last 12 weeks")
+                    trendCard
+                }
+
+                VStack(alignment: .leading, spacing: Theme.Spacing.m) {
+                    SectionHeading(title: "Goals in motion", detail: "Current streaks")
+                    leaderboardCard
+                }
             }
-            .padding(Theme.Spacing.l)
-            .padding(.bottom, Theme.Spacing.xxl)
+            .padding(.horizontal, Theme.pagePadding)
+            .padding(.top, Theme.Spacing.xs)
+            .padding(.bottom, Theme.Spacing.huge)
         }
         .scrollIndicators(.hidden)
+    }
+
+    private var summarySurface: some View {
+        VStack(spacing: Theme.Spacing.xl) {
+            weekHero
+            Divider()
+            tiles
+        }
+        .padding(Theme.Spacing.xl)
+        .card(cornerRadius: Theme.Radius.hero)
     }
 
     // MARK: - Hero
@@ -45,10 +63,10 @@ struct StatsView: View {
         let done = weekTotals.done
         let total = weekTotals.total
         let fraction = total == 0 ? 0 : Double(done) / Double(total)
-        return HStack(spacing: Theme.Spacing.xl) {
+        return HStack(spacing: Theme.Spacing.l) {
             ZStack {
                 ProgressRing(fraction: fraction, lineWidth: 11)
-                    .frame(width: 92, height: 92)
+                    .frame(width: 84, height: 84)
                 Text(fraction.formatted(.percent.precision(.fractionLength(0))))
                     .font(.system(.title2, design: .rounded).weight(.bold))
                     .monospacedDigit()
@@ -58,23 +76,24 @@ struct StatsView: View {
             .accessibilityLabel("This week's completion")
             .accessibilityValue(fraction.formatted(.percent.precision(.fractionLength(0))))
             VStack(alignment: .leading, spacing: 4) {
-                Text("This week").font(.title3.weight(.semibold))
+                Text("Toward your goals")
+                    .font(.title3.weight(.semibold))
                 Text("\(done) of \(total) check-ins done")
                     .font(.subheadline).foregroundStyle(.secondary)
             }
             Spacer(minLength: 0)
         }
-        .padding(Theme.Spacing.xl)
         .frame(maxWidth: .infinity)
-        .card(cornerRadius: Theme.Radius.hero)
     }
 
     // MARK: - Tiles
 
     private var tiles: some View {
-        HStack(spacing: Theme.Spacing.m) {
+        HStack(spacing: Theme.Spacing.s) {
             statTile(value: "\(active.count)", label: "Goals", symbol: "flag.fill")
+            Divider().frame(height: 52)
             statTile(value: "\(longestStreak)", label: "Best streak", symbol: "flame.fill")
+            Divider().frame(height: 52)
             statTile(value: "\(totalCompletions)", label: "Check-ins", symbol: "checkmark.seal.fill")
         }
     }
@@ -94,18 +113,15 @@ struct StatsView: View {
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, Theme.Spacing.l)
-        .card(cornerRadius: Theme.Radius.button)
     }
 
     // MARK: - Trend
 
     private var trendCard: some View {
-        VStack(alignment: .leading, spacing: Theme.Spacing.m) {
-            Text("Last 12 weeks").font(.headline)
+        VStack(alignment: .leading, spacing: Theme.Spacing.l) {
             TrendChartView(points: aggregateTrend)
         }
-        .padding(Theme.Spacing.l)
+        .padding(Theme.Spacing.xl)
         .frame(maxWidth: .infinity, alignment: .leading)
         .card()
     }
@@ -113,20 +129,28 @@ struct StatsView: View {
     // MARK: - Leaderboard
 
     private var leaderboardCard: some View {
-        VStack(alignment: .leading, spacing: Theme.Spacing.m) {
-            Text("Current streaks").font(.headline)
-            VStack(spacing: Theme.Spacing.m) {
-                ForEach(streakRanking, id: \.0.id) { goal, streak in
-                    HStack(spacing: Theme.Spacing.m) {
-                        GoalIcon(symbol: goal.symbol, tint: goal.accent.color, size: 34)
-                        Text(goal.title).font(.subheadline.weight(.medium)).lineLimit(1)
-                        Spacer(minLength: Theme.Spacing.s)
-                        StreakBadge(count: streak.current, unit: streak.unit, tint: goal.accent.color, showsLabel: true)
-                    }
+        VStack(alignment: .leading, spacing: 0) {
+            ForEach(Array(streakRanking.enumerated()), id: \.element.0.id) { index, item in
+                let goal = item.0
+                let streak = item.1
+                HStack(spacing: Theme.Spacing.m) {
+                    GoalIcon(symbol: goal.symbol, tint: goal.accent.color, size: 40)
+                    Text(goal.title)
+                        .font(.subheadline.weight(.medium))
+                        .lineLimit(1)
+                    Spacer(minLength: Theme.Spacing.s)
+                    StreakBadge(count: streak.current, unit: streak.unit,
+                                tint: goal.accent.color, showsLabel: true)
+                }
+                .padding(.vertical, Theme.Spacing.m)
+
+                if index < streakRanking.count - 1 {
+                    Divider()
+                        .padding(.leading, 56)
                 }
             }
         }
-        .padding(Theme.Spacing.l)
+        .padding(.horizontal, Theme.Spacing.xl)
         .frame(maxWidth: .infinity, alignment: .leading)
         .card()
     }

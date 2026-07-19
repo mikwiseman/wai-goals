@@ -55,7 +55,7 @@ struct GoalsListView: View {
 
     private var list: some View {
         List {
-            Section("Active") {
+            Section {
                 ForEach(active) { goal in
                     NavigationLink {
                         GoalDetailView(goal: goal)
@@ -71,12 +71,21 @@ struct GoalsListView: View {
                         }
                         .tint(.gray)
                     }
+                    .listRowInsets(.init(top: Theme.Spacing.s, leading: Theme.Spacing.l,
+                                        bottom: Theme.Spacing.s, trailing: Theme.Spacing.l))
                 }
                 .onMove(perform: move)
+            } header: {
+                HStack {
+                    Text("Active goals")
+                    Spacer()
+                    Text("\(active.count)")
+                        .monospacedDigit()
+                }
             }
 
             if !archived.isEmpty {
-                Section("Archived") {
+                Section {
                     ForEach(archived) { goal in
                         GoalListRow(goal: goal, calendar: calendar)
                             .foregroundStyle(.secondary)
@@ -89,11 +98,21 @@ struct GoalsListView: View {
                                 }
                                 .tint(.blue)
                             }
+                            .listRowInsets(.init(top: Theme.Spacing.s, leading: Theme.Spacing.l,
+                                                bottom: Theme.Spacing.s, trailing: Theme.Spacing.l))
+                    }
+                } header: {
+                    HStack {
+                        Text("Archived")
+                        Spacer()
+                        Text("\(archived.count)")
+                            .monospacedDigit()
                     }
                 }
             }
         }
         .listStyle(.insetGrouped)
+        .listSectionSpacing(Theme.Spacing.xl)
         .scrollContentBackground(.hidden)
     }
 
@@ -136,7 +155,7 @@ struct GoalListRow: View {
     var body: some View {
         let tint = goal.accent.color
         HStack(spacing: Theme.Spacing.m) {
-            GoalIcon(symbol: goal.symbol, tint: tint, size: 40)
+            GoalIcon(symbol: goal.symbol, tint: tint, size: 44)
             VStack(alignment: .leading, spacing: 3) {
                 Text(goal.title)
                     .font(.body.weight(.semibold))
@@ -156,6 +175,6 @@ struct GoalListRow: View {
                 StreakBadge(count: streak.current, unit: streak.unit, tint: tint)
             }
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, Theme.Spacing.xxs)
     }
 }

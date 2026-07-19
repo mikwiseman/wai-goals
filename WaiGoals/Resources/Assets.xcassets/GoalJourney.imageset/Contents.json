@@ -1,10 +1,9 @@
 {
   "images" : [
     {
-      "filename" : "icon-1024.png",
+      "filename" : "goal-journey.png",
       "idiom" : "universal",
-      "platform" : "ios",
-      "size" : "1024x1024"
+      "scale" : "1x"
     },
     {
       "appearances" : [
@@ -13,10 +12,9 @@
           "value" : "dark"
         }
       ],
-      "filename" : "icon-1024-dark.png",
+      "filename" : "goal-journey-dark.png",
       "idiom" : "universal",
-      "platform" : "ios",
-      "size" : "1024x1024"
+      "scale" : "1x"
     }
   ],
   "info" : {

@@ -45,6 +45,9 @@ struct SettingsView: View {
                 }
                 #endif
             }
+            .formStyle(.grouped)
+            .scrollContentBackground(.hidden)
+            .background(AppBackground())
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

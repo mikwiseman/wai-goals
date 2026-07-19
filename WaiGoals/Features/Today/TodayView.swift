@@ -110,34 +110,69 @@ struct TodayView: View {
 
     private var content: some View {
         ScrollView {
-            VStack(spacing: Theme.Spacing.l) {
+            VStack(alignment: .leading, spacing: Theme.Spacing.xxl) {
                 Text(today.formatted(.dateTime.weekday(.wide).month(.wide).day()))
                     .font(.subheadline.weight(.medium))
                     .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, Theme.Spacing.xs)
-
+                    .padding(.horizontal, Theme.Spacing.xxs)
                 hero
 
-                LazyVStack(spacing: Theme.Spacing.m) {
-                    ForEach(sortedDue) { goal in
-                        let hasIntention = goal.hasIntention(on: today, calendar: calendar)
-                        TodayGoalRow(
-                            goal: goal,
-                            isDone: goal.isCompleted(on: today, calendar: calendar),
-                            hasIntention: hasIntention,
-                            calendar: calendar,
-                            onToggle: { toggle(goal) },
-                            onIntend: { intentionGoal = goal },
-                            onOpen: { deepLinkedGoal = goal }
-                        )
+                VStack(alignment: .leading, spacing: Theme.Spacing.m) {
+                    SectionHeading(
+                        title: "Today’s goals",
+                        detail: sortedDue.isEmpty ? "Open day" : "\(doneCount)/\(dueGoals.count) complete"
+                    )
+                    todayGoalsSurface
+                }
+            }
+            .padding(.horizontal, Theme.pagePadding)
+            .padding(.top, Theme.Spacing.xs)
+            .padding(.bottom, Theme.Spacing.huge)
+        }
+        .scrollIndicators(.hidden)
+    }
+
+    @ViewBuilder
+    private var todayGoalsSurface: some View {
+        if sortedDue.isEmpty {
+            HStack(spacing: Theme.Spacing.m) {
+                Image(systemName: "circle.dotted")
+                    .font(.title2)
+                    .foregroundStyle(.tint)
+                VStack(alignment: .leading, spacing: Theme.Spacing.xxs) {
+                    Text("Nothing scheduled")
+                        .font(.headline)
+                    Text("The open space is part of the path too.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .padding(Theme.Spacing.xl)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .card()
+        } else {
+            LazyVStack(spacing: 0) {
+                ForEach(Array(sortedDue.enumerated()), id: \.element.id) { index, goal in
+                    let hasIntention = goal.hasIntention(on: today, calendar: calendar)
+                    TodayGoalRow(
+                        goal: goal,
+                        isDone: goal.isCompleted(on: today, calendar: calendar),
+                        hasIntention: hasIntention,
+                        calendar: calendar,
+                        onToggle: { toggle(goal) },
+                        onIntend: { intentionGoal = goal },
+                        onOpen: { deepLinkedGoal = goal }
+                    )
+                    .padding(.horizontal, Theme.Spacing.l)
+
+                    if index < sortedDue.count - 1 {
+                        Divider()
+                            .padding(.leading, 80)
                     }
                 }
             }
-            .padding(Theme.Spacing.l)
-            .padding(.bottom, Theme.Spacing.xxl)
+            .card()
         }
-        .scrollIndicators(.hidden)
     }
 
     private var hero: some View {
@@ -146,63 +181,60 @@ struct TodayView: View {
         let allDone = total > 0 && doneCount == total
         let pending = pendingGoals.count
         let intended = intendedPendingCount
-        return HStack(spacing: Theme.Spacing.xl) {
-            ZStack {
-                ProgressRing(fraction: fraction, lineWidth: 11)
-                    .frame(width: 92, height: 92)
-                if allDone {
-                    Image(systemName: "checkmark")
-                        .font(.system(.largeTitle, design: .rounded).weight(.bold))
-                        .foregroundStyle(.tint)
-                } else {
-                    VStack(spacing: 0) {
-                        Text("\(doneCount)")
-                            .font(.system(.title, design: .rounded).weight(.bold))
-                            .monospacedDigit()
-                            .minimumScaleFactor(0.5)
-                        Text("of \(total)")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
+        return VStack(alignment: .leading, spacing: Theme.Spacing.l) {
+            HStack(spacing: Theme.Spacing.l) {
+                GoalJourneyArtwork(size: 88)
+                VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
+                    Text(heroTitle(total: total, allDone: allDone, pending: pending, intended: intended))
+                        .font(.title3.weight(.semibold))
+                    Text(heroMessage(total: total, allDone: allDone, pending: pending, intended: intended))
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
+                Spacer(minLength: 0)
             }
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel("Today's progress")
-            .accessibilityValue(heroAccessibilityValue(total: total, allDone: allDone,
-                                                       pending: pending, intended: intended))
-            VStack(alignment: .leading, spacing: 4) {
-                Text(heroTitle(total: total, allDone: allDone, pending: pending, intended: intended))
-                    .font(.title3.weight(.semibold))
-                Text(heroMessage(total: total, allDone: allDone, pending: pending, intended: intended))
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+
+            VStack(spacing: Theme.Spacing.xs) {
+                ProgressView(value: fraction)
+                    .tint(.accentColor)
+                HStack {
+                    Text(total == 0 ? "No steps today" : "\(doneCount) of \(total) steps complete")
+                    Spacer()
+                    Text(fraction.formatted(.percent.precision(.fractionLength(0))))
+                        .monospacedDigit()
+                }
+                .font(.caption.weight(.medium))
+                .foregroundStyle(.secondary)
             }
-            Spacer(minLength: 0)
         }
         .padding(Theme.Spacing.xl)
         .frame(maxWidth: .infinity)
         .card(cornerRadius: Theme.Radius.hero)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Today's progress")
+        .accessibilityValue(heroAccessibilityValue(total: total, allDone: allDone,
+                                                   pending: pending, intended: intended))
     }
 
     private func heroTitle(total: Int, allDone: Bool, pending: Int, intended: Int) -> String {
-        if allDone { return "All done for today" }
-        if total == 0 { return "Nothing scheduled today" }
-        if pending > 0 && intended == pending { return "Today is committed" }
-        if intended > 0 { return "Intention in motion" }
-        return "Choose today’s intention"
+        if allDone { return "Every goal moved forward" }
+        if total == 0 { return "An open step" }
+        if pending > 0 && intended == pending { return "The path is set" }
+        if intended > 0 { return "Momentum has started" }
+        return "Move a goal forward"
     }
 
     private func heroMessage(total: Int, allDone: Bool, pending: Int, intended: Int) -> String {
-        if allDone { return "Every goal checked off. Nice work." }
-        if total == 0 { return "Enjoy the open space." }
+        if allDone { return "You reached every point you set for today." }
+        if total == 0 { return "No goal needs your attention today." }
         if pending > 0 && intended == pending {
-            return "All \(pending) pending \(pending == 1 ? "goal is" : "goals are") committed."
+            return "Every remaining goal has a clear intention."
         }
         if intended > 0 {
-            return "\(intended) of \(pending) pending \(pending == 1 ? "goal" : "goals") committed."
+            return "\(intended) of \(pending) remaining \(pending == 1 ? "goal has" : "goals have") a clear intention."
         }
-        return "\(pending) \(pending == 1 ? "goal is" : "goals are") waiting for approval."
+        return "\(pending) \(pending == 1 ? "goal is" : "goals are") ready for one deliberate step."
     }
 
     private func heroAccessibilityValue(total: Int, allDone: Bool, pending: Int, intended: Int) -> String {

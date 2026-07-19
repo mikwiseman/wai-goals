@@ -44,6 +44,9 @@ struct GoalEditorView: View {
                 scheduleSection
                 reminderSection
             }
+            .formStyle(.grouped)
+            .scrollContentBackground(.hidden)
+            .background(AppBackground(tint: accent.color))
             .navigationTitle(editingGoal == nil ? "New Goal" : "Edit Goal")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -63,13 +66,13 @@ struct GoalEditorView: View {
     private var previewSection: some View {
         Section {
             VStack(spacing: Theme.Spacing.s) {
-                GoalIcon(symbol: symbol, tint: accent.color, size: 64)
+                GoalIcon(symbol: symbol, tint: accent.color, size: 72)
                 Text(title.isEmpty ? "New goal" : title)
                     .font(.headline)
                     .foregroundStyle(title.isEmpty ? .secondary : .primary)
             }
             .frame(maxWidth: .infinity)
-            .padding(.vertical, Theme.Spacing.s)
+            .padding(.vertical, Theme.Spacing.l)
             .listRowBackground(Color.clear)
         }
     }
