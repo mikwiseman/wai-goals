@@ -1,8 +1,8 @@
 **Comparison Target**
 
-- Source visual truth: `db67dcf:Screenshots/today.png` for the previous WaiGoals composition and `/Users/mikwiseman/.codex/generated_images/019f716b-3319-7151-9d05-3acd645d5720/exec-5238469a-e550-41df-b2c9-47f7e3c3eae2.png` for the selected Escher-inspired goal-path artwork.
+- Source visual truth: `db67dcf:Screenshots/today.png` for the previous WaiGoals composition, `ee08142:Screenshots/today-dark.png` for the build 5 dark rendering, and `/Users/mikwiseman/.codex/generated_images/019f716b-3319-7151-9d05-3acd645d5720/exec-65f6e69f-90b4-4e82-ab3c-6be22031ce6b.png` for the corrected high-contrast dark artwork.
 - Implementation screenshot: `/Users/mikwiseman/Documents/Code/wai-goals/Screenshots/today.png`.
-- Additional implementation states: `Screenshots/today-dark.png`, `Screenshots/goals.png`, `Screenshots/stats.png`, `Screenshots/detail.png`, `Screenshots/editor.png`, and `Screenshots/settings.png`.
+- Additional implementation states: `Screenshots/home-dark.png`, `Screenshots/today-dark.png`, `Screenshots/goals.png`, `Screenshots/stats.png`, `Screenshots/detail.png`, `Screenshots/editor.png`, and `Screenshots/settings.png`.
 - Viewport: iPhone 17 Pro Max simulator, 368 x 800 points, iOS 26.2.
 - State: seeded sample data; Today, Goals, Statistics, goal detail, editor, and settings; light and dark appearances.
 
@@ -12,10 +12,12 @@
 - The implementation preserves the product's native tab, list, sheet, form, progress, and navigation patterns while replacing the dense card wall with fewer grouped Liquid Glass surfaces and more vertical space.
 - The goal concept now reads above the fold through the impossible ascending stair, amber progress sphere, central void, `Momentum has started`, and `Move a goal forward` copy.
 - The rendered implementation was then inspected screen by screen in the iOS Simulator. No persistent control overlap, horizontal clipping, broken wrapping, or unusable tap target was observed.
+- The build 5 and build 6 dark Today renders were normalized to the same 368 x 800 viewport and opened together. Build 6 keeps the same composition while making the complete stair loop readable at its actual hero size.
 
 **Focused Region Comparison Evidence**
 
 - Hero artwork: inspected at full size in the generated source and in both light and dark Today renders. The initial light asset produced a harsh white square in dark appearance; a dedicated dark luminosity asset was generated and the revised render was rechecked.
+- Dark thumbnail legibility: compared the build 5 and corrected assets together at 60 x 60 pixels, then installed the corrected asset and inspected `Screenshots/home-dark.png` on the real iOS Home Screen. The full staircase silhouette, central void, and amber sphere remain distinct at system icon size.
 - Goal rows and tab bar: inspected in Today and Goals for icon weight, alignment, progress affordance, separators, selected state, and scroll clearance.
 - Momentum/history: inspected at the top and after scrolling goal detail to verify chart/heatmap legibility and tab-bar-safe scrolling.
 - Forms and sheets: inspected Add Goal and Settings for sheet corners, section hierarchy, controls, and readable system typography.
@@ -36,10 +38,13 @@
 
 **Comparison History**
 
-1. Earlier finding: [P2] the light Escher artwork rendered as a conspicuous white square in dark appearance.
+1. Earlier finding: [P2] user feedback from build 5 showed that the dark app icon's staircase was almost invisible at phone icon size.
+   Fix: preserved the exact impossible-stair geometry while lifting cobalt/periwinkle top planes, midtone stair faces, edge highlights, and local background separation; replaced both dark luminosity assets.
+   Post-fix evidence: `Screenshots/home-dark.png` and `Screenshots/today-dark.png`; the staircase reads as one complete loop at system icon and in-app hero sizes without turning the overall icon into a light-mode square.
+2. Earlier finding: [P2] the light Escher artwork rendered as a conspicuous white square in dark appearance.
    Fix: generated a geometry-matched midnight-indigo dark variant and assigned it through the asset catalog's dark luminosity appearance.
    Post-fix evidence: `Screenshots/today-dark.png`; artwork now integrates with the dark material background while preserving staircase and sphere contrast.
-2. Earlier finding: [P2] the previous Today screen had dense independent cards and the primary goal concept was not immediately legible.
+3. Earlier finding: [P2] the previous Today screen had dense independent cards and the primary goal concept was not immediately legible.
    Fix: introduced one goal-journey hero, explicit momentum copy, a linear path indicator, grouped daily goals, larger spacing tokens, and restrained material surfaces.
    Post-fix evidence: `Screenshots/today.png`; the goal path is now the primary above-the-fold hierarchy and the content density is visibly reduced.
 
@@ -51,6 +56,7 @@
 
 - [x] Use the selected Escher-inspired impossible staircase as the product's goal metaphor.
 - [x] Supply dedicated light and dark artwork variants.
+- [x] Verify the dark app icon at actual Home Screen scale, not only at source resolution.
 - [x] Apply the airy Liquid Glass system across all user-facing screens.
 - [x] Verify primary navigation, goal detail, creation sheet, settings, and scrolling with realistic data.
 - [x] Verify native build and automated tests.
