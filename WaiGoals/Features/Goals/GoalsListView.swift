@@ -19,6 +19,7 @@ struct GoalsListView: View {
                 if goals.isEmpty {
                     EmptyStateView(
                         symbol: "square.stack.3d.up",
+                        emotion: .courage,
                         title: "No goals yet",
                         message: "Add goals you want to keep up with — daily, on certain days, or a few times a week.",
                         actionTitle: "Add a goal",
@@ -151,30 +152,68 @@ struct GoalsListView: View {
 struct GoalListRow: View {
     let goal: Goal
     var calendar: Calendar = .current
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
         let tint = goal.accent.color
-        HStack(spacing: Theme.Spacing.m) {
-            GoalIcon(symbol: goal.symbol, tint: tint, size: 44)
-            VStack(alignment: .leading, spacing: 3) {
-                Text(goal.title)
-                    .font(.body.weight(.semibold))
-                    .lineLimit(1)
-                HStack(spacing: 6) {
-                    Text(goal.schedule.summary(calendar: calendar))
-                    if goal.reminderEnabled, let time = goal.reminderTime {
-                        Text("· \(time.formatted(date: .omitted, time: .shortened))")
+        let streak = goal.streak(asOf: .now, calendar: calendar)
+        Group {
+            if dynamicTypeSize.isAccessibilitySize {
+                VStack(alignment: .leading, spacing: Theme.Spacing.s) {
+                    HStack(alignment: .top, spacing: Theme.Spacing.m) {
+                        artwork(size: 52, tint: tint)
+                        Text(goal.title)
+                            .font(.body.weight(.semibold))
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    Text(metadata)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    if streak.current > 0 {
+                        StreakBadge(count: streak.current, unit: streak.unit,
+                                    tint: tint, showsLabel: true)
                     }
                 }
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            }
-            Spacer(minLength: Theme.Spacing.s)
-            let streak = goal.streak(asOf: .now, calendar: calendar)
-            if streak.current > 0 {
-                StreakBadge(count: streak.current, unit: streak.unit, tint: tint)
+            } else {
+                HStack(spacing: Theme.Spacing.m) {
+                    artwork(size: 48, tint: tint)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(goal.title)
+                            .font(.body.weight(.semibold))
+                            .lineLimit(1)
+                        Text(metadata)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.72)
+                    }
+                    Spacer(minLength: Theme.Spacing.s)
+                    if streak.current > 0 {
+                        StreakBadge(count: streak.current, unit: streak.unit, tint: tint)
+                    }
+                }
             }
         }
         .padding(.vertical, Theme.Spacing.xxs)
+        .accessibilityElement(children: .combine)
+    }
+
+    @ViewBuilder
+    private func artwork(size: CGFloat, tint: Color) -> some View {
+        if let emotion = goal.emotion {
+            EmotionArtwork(emotion: emotion, size: size, decorative: false)
+        } else {
+            GoalIcon(symbol: goal.symbol, tint: tint, size: size)
+        }
+    }
+
+    private var metadata: String {
+        var parts = [goal.schedule.summary(calendar: calendar)]
+        if let emotion = goal.emotion { parts.append(emotion.displayName) }
+        if goal.reminderEnabled, let time = goal.reminderTime {
+            parts.append(time.formatted(date: .omitted, time: .shortened))
+        }
+        return parts.joined(separator: " · ")
     }
 }

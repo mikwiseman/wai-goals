@@ -5,6 +5,7 @@ struct GoalEditorView: View {
     @Environment(\.modelContext) private var context
     @Environment(\.dismiss) private var dismiss
     @Environment(NotificationScheduler.self) private var scheduler
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Query(sort: \Goal.sortIndex) private var allGoals: [Goal]
 
     private let editingGoal: Goal?
@@ -12,6 +13,7 @@ struct GoalEditorView: View {
     @State private var title: String
     @State private var symbol: String
     @State private var accent: AccentToken
+    @State private var emotion: GoalEmotion?
     @State private var scheduleType: ScheduleType
     @State private var weekdays: Set<Weekday>
     @State private var timesPerWeek: Int
@@ -25,6 +27,7 @@ struct GoalEditorView: View {
         _title = State(initialValue: goal?.title ?? "")
         _symbol = State(initialValue: goal?.symbol ?? "target")
         _accent = State(initialValue: goal?.accent ?? .default)
+        _emotion = State(initialValue: goal?.emotion)
         _scheduleType = State(initialValue: schedule.type)
         _weekdays = State(initialValue: schedule.weekdays.isEmpty ? [.monday, .wednesday, .friday] : schedule.weekdays)
         _timesPerWeek = State(initialValue: schedule.type == .timesPerWeek ? schedule.timesPerWeek : 3)
@@ -40,6 +43,7 @@ struct GoalEditorView: View {
         NavigationStack {
             Form {
                 previewSection
+                emotionSection
                 detailsSection
                 scheduleSection
                 reminderSection
@@ -66,14 +70,38 @@ struct GoalEditorView: View {
     private var previewSection: some View {
         Section {
             VStack(spacing: Theme.Spacing.s) {
-                GoalIcon(symbol: symbol, tint: accent.color, size: 72)
+                ZStack(alignment: .bottomTrailing) {
+                    if let emotion {
+                        EmotionArtwork(emotion: emotion, size: 104, animated: true)
+                    } else {
+                        GoalJourneyArtwork(size: 104)
+                    }
+                    GoalIcon(symbol: symbol, tint: accent.color, size: 36)
+                        .offset(x: 5, y: 5)
+                }
                 Text(title.isEmpty ? "New goal" : title)
                     .font(.headline)
                     .foregroundStyle(title.isEmpty ? .secondary : .primary)
+                if let emotion {
+                    Text("Toward \(emotion.displayName.lowercased()) · \(emotion.feeling)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, Theme.Spacing.l)
             .listRowBackground(Color.clear)
+        }
+    }
+
+    private var emotionSection: some View {
+        Section {
+            EmotionPicker(selection: $emotion, tint: accent.color)
+                .padding(.vertical, Theme.Spacing.xs)
+        } header: {
+            Text("How do you want to feel?")
+        } footer: {
+            Text("A goal is a way of becoming, not just a box to tick.")
         }
     }
 
@@ -121,7 +149,7 @@ struct GoalEditorView: View {
                 .accessibilityAddTraits(accent == token ? .isSelected : [])
             }
         }
-        .animation(.snappy(duration: 0.2), value: accent)
+        .animation(reduceMotion ? nil : .snappy(duration: 0.2), value: accent)
     }
 
     private var scheduleSection: some View {
@@ -171,7 +199,7 @@ struct GoalEditorView: View {
 
     private var reminderSection: some View {
         Section("Reminder") {
-            Toggle("Remind me", isOn: $reminderEnabled.animation())
+            Toggle("Remind me", isOn: $reminderEnabled.animation(reduceMotion ? nil : .default))
             if reminderEnabled {
                 DatePicker("Time", selection: $reminderTime, displayedComponents: .hourAndMinute)
                 if scheduler.authorizationStatus == .denied {
@@ -188,6 +216,7 @@ struct GoalEditorView: View {
 
     private var canSave: Bool {
         !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+        emotion != nil &&
         (scheduleType != .specificDays || !weekdays.isEmpty)
     }
 
@@ -207,12 +236,13 @@ struct GoalEditorView: View {
             goal.title = trimmed
             goal.symbol = symbol
             goal.colorToken = accent.rawValue
+            goal.emotion = emotion
             goal.schedule = schedule
             goal.reminderEnabled = reminderEnabled
             goal.reminderTime = time
         } else {
             let nextIndex = (allGoals.map(\.sortIndex).max() ?? -1) + 1
-            let goal = Goal(title: trimmed, symbol: symbol, color: accent, schedule: schedule,
+            let goal = Goal(title: trimmed, symbol: symbol, color: accent, emotion: emotion, schedule: schedule,
                             reminderEnabled: reminderEnabled, reminderTime: time, sortIndex: nextIndex)
             context.insert(goal)
         }

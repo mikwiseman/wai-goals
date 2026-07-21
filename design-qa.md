@@ -1,36 +1,38 @@
 **Comparison Target**
 
-- Source visual truth: `db67dcf:Screenshots/today.png` for the previous WaiGoals composition, `ee08142:Screenshots/today-dark.png` for the build 5 dark rendering, and `/Users/mikwiseman/.codex/generated_images/019f716b-3319-7151-9d05-3acd645d5720/exec-65f6e69f-90b4-4e82-ab3c-6be22031ce6b.png` for the corrected high-contrast dark artwork.
-- Implementation screenshot: `/Users/mikwiseman/Documents/Code/wai-goals/Screenshots/today.png`.
-- Additional implementation states: `Screenshots/home-dark.png`, `Screenshots/today-dark.png`, `Screenshots/goals.png`, `Screenshots/stats.png`, `Screenshots/detail.png`, `Screenshots/editor.png`, and `Screenshots/settings.png`.
-- Viewport: iPhone 17 Pro Max simulator, 368 x 800 points, iOS 26.2.
-- State: seeded sample data; Today, Goals, Statistics, goal detail, editor, and settings; light and dark appearances.
+- Source visual truth: `731a7df:Screenshots/today.png` and `731a7df:Screenshots/today-dark.png`, plus the existing `GoalJourney` impossible-stair language.
+- Implementation screenshots: `Screenshots/today.png`, `Screenshots/today-dark.png`, `Screenshots/goals.png`, `Screenshots/stats.png`, `Screenshots/detail.png`, and `Screenshots/editor.png`.
+- Motion evidence: `Screenshots/completion-emotion.mp4` and `Screenshots/completion-emotion.png`.
+- Same-view comparison inputs: `Screenshots/qa-today-light-comparison.png` and `Screenshots/qa-today-dark-comparison.png`.
+- Viewport: iOS 26.2 simulator, 368 x 800 points.
+- State: seeded sample data; Today, Goals, Statistics, goal detail, new-goal editor, completion reward, light and dark appearance.
 
 **Full-view Comparison Evidence**
 
-- The source and implementation Today screens were opened together in one comparison input at the same viewport and seeded state.
-- The implementation preserves the product's native tab, list, sheet, form, progress, and navigation patterns while replacing the dense card wall with fewer grouped Liquid Glass surfaces and more vertical space.
-- The goal concept now reads above the fold through the impossible ascending stair, amber progress sphere, central void, `Momentum has started`, and `Move a goal forward` copy.
-- The rendered implementation was then inspected screen by screen in the iOS Simulator. No persistent control overlap, horizontal clipping, broken wrapping, or unusable tap target was observed.
-- The build 5 and build 6 dark Today renders were normalized to the same 368 x 800 viewport and opened together. Build 6 keeps the same composition while making the complete stair loop readable at its actual hero size.
+- The prior approved Today screen and the new implementation were placed side by side at the same viewport in both appearances.
+- The impossible stair remains the primary goal metaphor. Eight generated emotional journeys extend its cobalt, indigo, violet, and warm-light language without introducing a second visual system.
+- Today retains the airy hierarchy and grouped list. Emotion moved into compact supporting copy so three goals remain visible above the tab bar.
+- Goals, Statistics, detail, and editor were inspected as complete rendered views and after scrolling where required.
 
 **Focused Region Comparison Evidence**
 
-- Hero artwork: inspected at full size in the generated source and in both light and dark Today renders. The initial light asset produced a harsh white square in dark appearance; a dedicated dark luminosity asset was generated and the revised render was rechecked.
-- Dark thumbnail legibility: compared the build 5 and corrected assets together at 60 x 60 pixels, then installed the corrected asset and inspected `Screenshots/home-dark.png` on the real iOS Home Screen. The full staircase silhouette, central void, and amber sphere remain distinct at system icon size.
-- Goal rows and tab bar: inspected in Today and Goals for icon weight, alignment, progress affordance, separators, selected state, and scroll clearance.
-- Momentum/history: inspected at the top and after scrolling goal detail to verify chart/heatmap legibility and tab-bar-safe scrolling.
-- Forms and sheets: inspected Add Goal and Settings for sheet corners, section hierarchy, controls, and readable system typography.
+- Emotional direction: Focus, Calm, Courage, Energy, Joy, Connection, Growth, and Balance each have distinct generated artwork, feeling copy, and completion copy.
+- Today: featured-emotion hero, animated progress, compact emotion metadata, intention state, and completion reward were checked.
+- Goals and detail: artwork identity, schedule metadata, progress, history, statistics, and edit controls were checked.
+- Statistics: animated progress ring, weekly trend, emotional momentum, and leaderboard were checked.
+- Editor: the emotional choice is required for new or edited goals; all eight choices, goal fields, schedule, and reminder controls were checked through the full scroll range.
+- Accessibility: semantic snapshots were inspected for labels and duplicate content. Generated artwork is decorative internally and exposed through one meaningful container label.
+- Dynamic Type: Today, Goals, Statistics, and Editor were exercised at `accessibility-extra-extra-extra-large`; adaptive vertical layouts prevent title, metadata, picker, and progress-ring collisions.
+- Reduce Motion: with `ReduceMotionEnabled = 1`, the runtime reached the settled UI predicate. With the setting off, the ambient hero intentionally remains in motion.
 
 **Required Fidelity Surfaces**
 
-- Fonts and typography: native San Francisco hierarchy is consistent across titles, section labels, metrics, rows, forms, and helper copy; no visible truncation or broken wrapping at the tested viewport.
-- Spacing and layout rhythm: 20-point page margins, larger section gaps, fewer containers, consistent radii, and grouped rows create the intended air without weakening scanability.
-- Colors and visual tokens: system semantic backgrounds/materials preserve contrast across light and dark appearance; blue/violet washes stay subordinate to content; amber is reserved for the goal-progress sphere.
-- Image quality and asset fidelity: the real generated 1024 x 1024 light/dark assets are used for the app icon and in-app artwork with matching crop and geometry; no placeholder, emoji, handcrafted SVG, or code-drawn substitute is present.
-- Copy and content: goal language is explicit and standalone (`Move a goal forward`, `Momentum has started`, `Goals in motion`, `The path behind you`).
-- Icons: native SF Symbols share one optical family and remain aligned in tabs, rows, buttons, editor, and settings.
-- Accessibility and resilience: native controls and labels retain platform interaction behavior; Reduce Transparency has a solid-surface path; light/dark appearances and vertical scrolling were exercised. Dynamic Type extremes and Reduce Motion remain residual test gaps, not observed failures.
+- Typography: native San Francisco hierarchy, wrapping, and numeric transitions remain readable at standard and maximum accessibility sizes.
+- Spacing: existing 20-point page margins and large section gaps are preserved; generated artwork is used as identity rather than extra decorative chrome.
+- Materials and color: semantic Liquid Glass surfaces work in both appearances. New artwork keeps a dark surround and luminous cobalt geometry so it remains legible on the phone.
+- Assets: all eight 512 x 512 raster assets are generated images with valid asset-catalog metadata and a verified runtime load test.
+- Motion: ambient float, staggered entrance, spring selection, completion reward, chart/progress reveals, and symbol feedback are purposeful and gated by Reduce Motion.
+- Product logic: legacy goals remain explicitly unassigned instead of receiving a silent default. Fresh goals require an emotional direction.
 
 **Findings**
 
@@ -38,31 +40,29 @@
 
 **Comparison History**
 
-1. Earlier finding: [P2] user feedback from build 5 showed that the dark app icon's staircase was almost invisible at phone icon size.
-   Fix: preserved the exact impossible-stair geometry while lifting cobalt/periwinkle top planes, midtone stair faces, edge highlights, and local background separation; replaced both dark luminosity assets.
-   Post-fix evidence: `Screenshots/home-dark.png` and `Screenshots/today-dark.png`; the staircase reads as one complete loop at system icon and in-app hero sizes without turning the overall icon into a light-mode square.
-2. Earlier finding: [P2] the light Escher artwork rendered as a conspicuous white square in dark appearance.
-   Fix: generated a geometry-matched midnight-indigo dark variant and assigned it through the asset catalog's dark luminosity appearance.
-   Post-fix evidence: `Screenshots/today-dark.png`; artwork now integrates with the dark material background while preserving staircase and sphere contrast.
-3. Earlier finding: [P2] the previous Today screen had dense independent cards and the primary goal concept was not immediately legible.
-   Fix: introduced one goal-journey hero, explicit momentum copy, a linear path indicator, grouped daily goals, larger spacing tokens, and restrained material surfaces.
-   Post-fix evidence: `Screenshots/today.png`; the goal path is now the primary above-the-fold hierarchy and the content density is visibly reduced.
+1. [P2] Emotion pills initially made Today denser than the approved airy baseline.
+   Fix: reduced emotion to one compact subtitle line and rechecked the side-by-side light and dark comparisons.
+2. [P2] `Connection` and goal metadata wrapped awkwardly in narrow rows.
+   Fix: constrained the picker label and composed schedule plus emotion as one responsive metadata line.
+3. [P1] At the largest accessibility size, the Today hero collapsed into a one-word column and goal titles truncated.
+   Fix: added accessibility-size vertical compositions for hero and rows; rechecked the complete screen and scroll states.
+4. [P2] The Statistics percentage overflowed its circular progress ring at the largest accessibility size.
+   Fix: stacked the ring and copy, constrained the percentage to the ring, and rechecked the rendered view.
+5. [P2] The original dark icon was too dim at Home Screen size.
+   Retained fix: all new emotional artwork uses luminous top planes, distinct edges, and local background separation.
 
-**Open Questions**
+**Verification**
 
-- None blocking handoff.
+- `xcodegen generate`: passed.
+- `git diff --check`: passed.
+- All generated `Contents.json` files: passed `jq empty`.
+- Xcode simulator tests: 36 passed, 0 failed, 0 skipped.
+- Final simulator build and launch: passed.
+- Final build and runtime logs: no fatal, assertion, crash, uncaught, error, or failed matches.
+- Light, dark, maximum Dynamic Type, and Reduce Motion states: exercised on the running simulator.
 
-**Implementation Checklist**
+**Residual P3**
 
-- [x] Use the selected Escher-inspired impossible staircase as the product's goal metaphor.
-- [x] Supply dedicated light and dark artwork variants.
-- [x] Verify the dark app icon at actual Home Screen scale, not only at source resolution.
-- [x] Apply the airy Liquid Glass system across all user-facing screens.
-- [x] Verify primary navigation, goal detail, creation sheet, settings, and scrolling with realistic data.
-- [x] Verify native build and automated tests.
-
-**Follow-up Polish**
-
-- P3: exercise the largest accessibility text sizes on a physical device before a public App Store release.
+- Physical-device haptic feel was not evaluated; haptics use native sensory feedback and are non-blocking for this simulator handoff.
 
 final result: passed

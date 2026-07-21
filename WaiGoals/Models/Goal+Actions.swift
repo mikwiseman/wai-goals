@@ -62,4 +62,5 @@ struct MilestoneInfo: Identifiable, Equatable {
     let streak: Int
     let unit: StreakUnit
     let accent: AccentToken
+    let emotion: GoalEmotion?
 }

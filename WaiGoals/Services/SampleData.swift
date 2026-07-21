@@ -27,11 +27,11 @@ enum SampleData {
     static func seed(_ context: ModelContext, calendar: Calendar = .current) {
         var index = 0
         func makeGoal(_ title: String, _ symbol: String, _ color: AccentToken,
-                      _ schedule: Schedule, reminderHour: Int? = nil) -> Goal {
+                      _ emotion: GoalEmotion, _ schedule: Schedule, reminderHour: Int? = nil) -> Goal {
             let reminder = reminderHour.map { hour in
                 calendar.date(bySettingHour: hour, minute: 0, second: 0, of: .now) ?? .now
             }
-            let goal = Goal(title: title, symbol: symbol, color: color, schedule: schedule,
+            let goal = Goal(title: title, symbol: symbol, color: color, emotion: emotion, schedule: schedule,
                             reminderEnabled: reminderHour != nil, reminderTime: reminder,
                             sortIndex: index)
             index += 1
@@ -41,34 +41,34 @@ enum SampleData {
 
         // 1. Daily, done today, healthy streak — Mik's own example.
         let stopWork = makeGoal("Stop working at 7 PM", "moon.stars.fill", .indigo,
-                                .daily, reminderHour: 19)
+                                .balance, .daily, reminderHour: 19)
         addDayOffsets(stopWork, Array(0...12), context, calendar) // 13-day streak incl. today
 
         // 2. Times per week — weekly streak, mid-week progress.
         let telegram = makeGoal("Post in Telegram", "paperplane.fill", .blue,
-                                Schedule(type: .timesPerWeek, timesPerWeek: 3), reminderHour: 11)
+                                .connection, Schedule(type: .timesPerWeek, timesPerWeek: 3), reminderHour: 11)
         addDates(telegram, weeklyDates(weeksAgo: 3, perWeek: 3, calendar: calendar), context)
         addDates(telegram, currentWeekDates(count: 1, calendar: calendar), context) // 1/3 this week
         addIntention(telegram, context, calendar)
 
         // 3. Specific days (Mon/Wed/Fri).
         let workout = makeGoal("Morning workout", "figure.run", .green,
-                               Schedule(type: .specificDays, weekdays: [.monday, .wednesday, .friday]),
+                               .energy, Schedule(type: .specificDays, weekdays: [.monday, .wednesday, .friday]),
                                reminderHour: 7)
         addDayOffsets(workout, scheduledOffsets(weekdays: [2, 4, 6], within: 40, includeToday: false, calendar: calendar),
                       context, calendar)
 
         // 4. Daily, big streak but undone today (grace) — actionable now.
-        let read = makeGoal("Read 20 pages", "book.fill", .amber, .daily, reminderHour: 21)
+        let read = makeGoal("Read 20 pages", "book.fill", .amber, .focus, .daily, reminderHour: 21)
         addDayOffsets(read, Array(1...34), context, calendar) // 34-day streak, today pending
         addIntention(read, context, calendar)
 
         // 5. Daily, just hit a milestone-ish streak, done today.
-        let meditate = makeGoal("Meditate 10 min", "figure.mind.and.body", .teal, .daily, reminderHour: 8)
+        let meditate = makeGoal("Meditate 10 min", "figure.mind.and.body", .teal, .calm, .daily, reminderHour: 8)
         addDayOffsets(meditate, Array(0...6), context, calendar) // 7-day streak incl. today
 
         // 6. Daily, recovering streak (a recent miss), undone today.
-        let phone = makeGoal("No phone after midnight", "iphone.slash", .violet, .daily)
+        let phone = makeGoal("No phone after midnight", "iphone.slash", .violet, .courage, .daily)
         addDayOffsets(phone, [1, 2, 3, 5, 6, 7, 8, 9, 10], context, calendar) // missed day 4
         addIntention(phone, context, calendar)
 

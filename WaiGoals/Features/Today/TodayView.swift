@@ -4,11 +4,15 @@ import SwiftData
 struct TodayView: View {
     @Environment(\.modelContext) private var context
     @Environment(NotificationCoordinator.self) private var coordinator
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Query(sort: \Goal.sortIndex) private var allGoals: [Goal]
 
     @State private var showingEditor = false
     @State private var showingSettings = false
     @State private var milestone: MilestoneInfo?
+    @State private var completionEmotion: GoalEmotion?
+    @State private var completionID = UUID()
     @State private var deepLinkedGoal: Goal?
     @State private var intentionGoal: Goal?
     @State private var didHandleLaunch = false
@@ -50,6 +54,7 @@ struct TodayView: View {
                 if allGoals.filter({ !$0.isArchived }).isEmpty {
                     EmptyStateView(
                         symbol: "sparkles",
+                        emotion: .growth,
                         title: "Start with one goal",
                         message: "Track the habits that matter — like “Stop working at 7 PM.” One tap a day is all it takes.",
                         actionTitle: "Add a goal",
@@ -92,18 +97,28 @@ struct TodayView: View {
                 case "editor": showingEditor = true
                 case "settings": showingSettings = true
                 case "detail": deepLinkedGoal = allGoals.first { !$0.isArchived }
-                case "milestone": milestone = MilestoneInfo(streak: 30, unit: .day, accent: .teal)
+                case "milestone": milestone = MilestoneInfo(streak: 30, unit: .day, accent: .teal, emotion: .growth)
                 default: break
                 }
             }
         }
         .overlay {
-            if let milestone {
-                MilestoneOverlay(streak: milestone.streak, unit: milestone.unit,
-                                 tint: milestone.accent.color) {
-                    withAnimation { self.milestone = nil }
+            ZStack {
+                if let completionEmotion {
+                    EmotionCompletionOverlay(emotion: completionEmotion)
+                        .transition(.scale(scale: 0.88).combined(with: .opacity))
                 }
-                .transition(.opacity)
+                if let milestone {
+                    MilestoneOverlay(streak: milestone.streak, unit: milestone.unit,
+                                     tint: milestone.accent.color, emotion: milestone.emotion) {
+                        if reduceMotion {
+                            self.milestone = nil
+                        } else {
+                            withAnimation { self.milestone = nil }
+                        }
+                    }
+                    .transition(.opacity)
+                }
             }
         }
     }
@@ -115,7 +130,9 @@ struct TodayView: View {
                     .font(.subheadline.weight(.medium))
                     .foregroundStyle(.secondary)
                     .padding(.horizontal, Theme.Spacing.xxs)
+                    .entranceMotion(order: 0)
                 hero
+                    .entranceMotion(order: 1)
 
                 VStack(alignment: .leading, spacing: Theme.Spacing.m) {
                     SectionHeading(
@@ -124,6 +141,7 @@ struct TodayView: View {
                     )
                     todayGoalsSurface
                 }
+                .entranceMotion(order: 2)
             }
             .padding(.horizontal, Theme.pagePadding)
             .padding(.top, Theme.Spacing.xs)
@@ -181,19 +199,10 @@ struct TodayView: View {
         let allDone = total > 0 && doneCount == total
         let pending = pendingGoals.count
         let intended = intendedPendingCount
+        let emotion = featuredEmotion
         return VStack(alignment: .leading, spacing: Theme.Spacing.l) {
-            HStack(spacing: Theme.Spacing.l) {
-                GoalJourneyArtwork(size: 88)
-                VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
-                    Text(heroTitle(total: total, allDone: allDone, pending: pending, intended: intended))
-                        .font(.title3.weight(.semibold))
-                    Text(heroMessage(total: total, allDone: allDone, pending: pending, intended: intended))
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                Spacer(minLength: 0)
-            }
+            heroLead(emotion: emotion, total: total, allDone: allDone,
+                     pending: pending, intended: intended)
 
             VStack(spacing: Theme.Spacing.xs) {
                 ProgressView(value: fraction)
@@ -215,6 +224,52 @@ struct TodayView: View {
         .accessibilityLabel("Today's progress")
         .accessibilityValue(heroAccessibilityValue(total: total, allDone: allDone,
                                                    pending: pending, intended: intended))
+    }
+
+    @ViewBuilder
+    private func heroLead(emotion: GoalEmotion?, total: Int, allDone: Bool,
+                          pending: Int, intended: Int) -> some View {
+        if dynamicTypeSize.isAccessibilitySize {
+            VStack(alignment: .leading, spacing: Theme.Spacing.l) {
+                heroArtwork(emotion: emotion)
+                    .frame(maxWidth: .infinity)
+                heroCopy(emotion: emotion, total: total, allDone: allDone,
+                         pending: pending, intended: intended)
+            }
+        } else {
+            HStack(spacing: Theme.Spacing.l) {
+                heroArtwork(emotion: emotion)
+                heroCopy(emotion: emotion, total: total, allDone: allDone,
+                         pending: pending, intended: intended)
+                Spacer(minLength: 0)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func heroArtwork(emotion: GoalEmotion?) -> some View {
+        if let emotion {
+            EmotionArtwork(emotion: emotion, size: 92, animated: true, decorative: false)
+        } else {
+            GoalJourneyArtwork(size: 88)
+        }
+    }
+
+    private func heroCopy(emotion: GoalEmotion?, total: Int, allDone: Bool,
+                          pending: Int, intended: Int) -> some View {
+        VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
+            Text(heroTitle(total: total, allDone: allDone, pending: pending, intended: intended))
+                .font(.title3.weight(.semibold))
+            Text(heroMessage(total: total, allDone: allDone, pending: pending, intended: intended))
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            if let emotion {
+                Text("Toward \(emotion.displayName.lowercased()) · \(emotion.feeling)")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.tint)
+            }
+        }
     }
 
     private func heroTitle(total: Int, allDone: Bool, pending: Int, intended: Int) -> String {
@@ -243,12 +298,52 @@ struct TodayView: View {
         return "\(doneCount) of \(total) goals complete, \(intended) of \(pending) pending goals have intentions"
     }
 
+    private var featuredEmotion: GoalEmotion? {
+        pendingGoals
+            .first(where: { $0.hasIntention(on: today, calendar: calendar) && $0.emotion != nil })?
+            .emotion
+            ?? pendingGoals.compactMap(\.emotion).first
+            ?? dueGoals.compactMap(\.emotion).first
+    }
+
     private func toggle(_ goal: Goal) {
+        let wasDone = goal.isCompleted(on: today, calendar: calendar)
         let newStreak = goal.toggleCompletion(on: today, context: context, calendar: calendar)
         if let newStreak, Milestone.reached(newStreak) {
             Haptics.success()
-            withAnimation {
-                milestone = MilestoneInfo(streak: newStreak, unit: goal.schedule.streakUnit, accent: goal.accent)
+            let info = MilestoneInfo(streak: newStreak, unit: goal.schedule.streakUnit,
+                                     accent: goal.accent, emotion: goal.emotion)
+            if reduceMotion {
+                milestone = info
+            } else {
+                withAnimation {
+                    milestone = info
+                }
+            }
+        } else if !wasDone, let emotion = goal.emotion {
+            showCompletion(emotion)
+        }
+    }
+
+    private func showCompletion(_ emotion: GoalEmotion) {
+        let id = UUID()
+        completionID = id
+        if reduceMotion {
+            completionEmotion = emotion
+        } else {
+            withAnimation(.spring(response: 0.34, dampingFraction: 0.78)) {
+                completionEmotion = emotion
+            }
+        }
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(1.35))
+            guard completionID == id else { return }
+            if reduceMotion {
+                completionEmotion = nil
+            } else {
+                withAnimation(.easeOut(duration: 0.22)) {
+                    completionEmotion = nil
+                }
             }
         }
     }

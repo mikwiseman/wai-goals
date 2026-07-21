@@ -71,16 +71,31 @@ struct GoalIcon: View {
 struct SectionHeading: View {
     let title: String
     var detail: String? = nil
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
-        HStack(alignment: .firstTextBaseline) {
-            Text(title)
-                .font(.headline)
-            Spacer(minLength: Theme.Spacing.m)
-            if let detail {
-                Text(detail)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+        Group {
+            if dynamicTypeSize.isAccessibilitySize {
+                VStack(alignment: .leading, spacing: Theme.Spacing.xxs) {
+                    Text(title)
+                        .font(.headline)
+                    if let detail {
+                        Text(detail)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            } else {
+                HStack(alignment: .firstTextBaseline) {
+                    Text(title)
+                        .font(.headline)
+                    Spacer(minLength: Theme.Spacing.m)
+                    if let detail {
+                        Text(detail)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
             }
         }
         .padding(.horizontal, Theme.Spacing.xxs)
@@ -123,12 +138,14 @@ struct StreakBadge: View {
             Text("\(count)")
                 .font(.callout.weight(.bold))
                 .monospacedDigit()
+                .contentTransition(.numericText())
             if showsLabel {
                 Text(unit.label(for: count))
                     .font(.caption)
             }
         }
         .foregroundStyle(count > 0 ? AnyShapeStyle(tint) : AnyShapeStyle(Color.secondary))
+        .accessibilityElement(children: .ignore)
         .accessibilityLabel(count > 0 ? "\(count) \(unit.label(for: count)) streak" : "No streak yet")
     }
 }
@@ -198,6 +215,7 @@ struct DayDot: View {
                     Image(systemName: "checkmark")
                         .font(.system(size: size * 0.42, weight: .bold))
                         .foregroundStyle(.white)
+                        .symbolEffect(.bounce, value: state == .completed)
                 }
             }
             .overlay(
@@ -303,6 +321,7 @@ struct MilestoneOverlay: View {
     let streak: Int
     let unit: StreakUnit
     var tint: Color = .accentColor
+    var emotion: GoalEmotion? = nil
     let onDismiss: () -> Void
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -317,11 +336,15 @@ struct MilestoneOverlay: View {
             if !reduceMotion { ConfettiView() }
 
             VStack(spacing: Theme.Spacing.l) {
-                ZStack {
-                    Circle().fill(tint.gradient).frame(width: 108, height: 108)
-                    Image(systemName: "flame.fill")
-                        .font(.system(size: 48, weight: .bold))
-                        .foregroundStyle(.white)
+                if let emotion {
+                    EmotionArtwork(emotion: emotion, size: 116, animated: true)
+                } else {
+                    ZStack {
+                        Circle().fill(tint.gradient).frame(width: 108, height: 108)
+                        Image(systemName: "flame.fill")
+                            .font(.system(size: 48, weight: .bold))
+                            .foregroundStyle(.white)
+                    }
                 }
                 VStack(spacing: 6) {
                     Text("\(streak) \(unit.label(for: streak)) in a row!")
@@ -331,6 +354,12 @@ struct MilestoneOverlay: View {
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
+                    if let emotion {
+                        Text(emotion.completionMessage)
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(tint)
+                            .padding(.top, Theme.Spacing.xxs)
+                    }
                 }
                 Button("Keep going", action: onDismiss)
                     .waiGlassButton(prominent: true)
@@ -349,6 +378,7 @@ struct MilestoneOverlay: View {
 
 struct EmptyStateView: View {
     let symbol: String
+    var emotion: GoalEmotion? = nil
     let title: String
     let message: String
     var actionTitle: String? = nil
@@ -357,10 +387,14 @@ struct EmptyStateView: View {
 
     var body: some View {
         VStack(spacing: Theme.Spacing.l) {
-            Image(systemName: symbol)
-                .font(.system(size: 52, weight: .regular))
-                .foregroundStyle(tint.gradient)
-                .symbolRenderingMode(.hierarchical)
+            if let emotion {
+                EmotionArtwork(emotion: emotion, size: 104, animated: true, decorative: false)
+            } else {
+                Image(systemName: symbol)
+                    .font(.system(size: 52, weight: .regular))
+                    .foregroundStyle(tint.gradient)
+                    .symbolRenderingMode(.hierarchical)
+            }
             VStack(spacing: Theme.Spacing.s) {
                 Text(title)
                     .font(.title3.weight(.semibold))
