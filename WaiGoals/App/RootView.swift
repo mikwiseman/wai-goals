@@ -43,6 +43,7 @@ struct RootView: View {
             if AppLaunch.seedSampleData {
                 SampleData.seedIfNeeded(context)
             }
+            AchievementUnlockStore.reconcile(goals: context.allGoals(), context: context)
             await scheduler.refreshAuthorizationStatus()
             scheduler.reschedule(for: context.allGoals())
         }

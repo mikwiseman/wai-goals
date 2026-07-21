@@ -3,7 +3,10 @@ import SwiftData
 
 struct StatsView: View {
     @Query(sort: \Goal.sortIndex) private var goals: [Goal]
+    @Query private var achievementUnlocks: [AchievementUnlock]
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Namespace private var achievementNamespace
+    @State private var selectedAchievement: AchievementProgress?
     private let calendar = Calendar.current
 
     private var active: [Goal] { goals.filter { !$0.isArchived } }
@@ -24,6 +27,10 @@ struct StatsView: View {
                 }
             }
             .navigationTitle("Stats")
+            .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
+            .navigationDestination(item: $selectedAchievement) { progress in
+                AchievementDetailView(progress: progress, namespace: achievementNamespace)
+            }
         }
     }
 
@@ -34,22 +41,31 @@ struct StatsView: View {
                     .entranceMotion(order: 0)
 
                 VStack(alignment: .leading, spacing: Theme.Spacing.m) {
-                    SectionHeading(title: "Your impossible atlas", detail: "8 emotional worlds")
-                    emotionMomentumStrip
+                    SectionHeading(
+                        title: "Impossible archive",
+                        detail: "\(unlockedAchievementCount)/\(AchievementID.allCases.count) discovered"
+                    )
+                    achievementArchive
                 }
                 .entranceMotion(order: 1)
+
+                VStack(alignment: .leading, spacing: Theme.Spacing.m) {
+                    SectionHeading(title: "Emotional worlds", detail: "8 inner directions")
+                    emotionMomentumStrip
+                }
+                .entranceMotion(order: 2)
 
                 VStack(alignment: .leading, spacing: Theme.Spacing.m) {
                     SectionHeading(title: "Momentum", detail: "Last 12 weeks")
                     trendCard
                 }
-                .entranceMotion(order: 2)
+                .entranceMotion(order: 3)
 
                 VStack(alignment: .leading, spacing: Theme.Spacing.m) {
                     SectionHeading(title: "Goals in motion", detail: "Current streaks")
                     leaderboardCard
                 }
-                .entranceMotion(order: 3)
+                .entranceMotion(order: 4)
             }
             .padding(.horizontal, Theme.pagePadding)
             .padding(.top, Theme.Spacing.xs)
@@ -115,7 +131,7 @@ struct StatsView: View {
         VStack(alignment: .leading, spacing: 4) {
             Text("Toward your goals")
                 .font(.title3.weight(.semibold))
-            Text("\(done) of \(total) check-ins done")
+            Text("\(done) of \(total) steps done")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
         }
@@ -131,7 +147,7 @@ struct StatsView: View {
                     Divider()
                     statTile(value: "\(longestStreak)", label: "Best streak", symbol: "flame.fill")
                     Divider()
-                    statTile(value: "\(totalCompletions)", label: "Check-ins", symbol: "checkmark.seal.fill")
+                    statTile(value: "\(totalCompletions)", label: "Steps", symbol: "checkmark.seal.fill")
                 }
             } else {
                 HStack(spacing: Theme.Spacing.s) {
@@ -139,10 +155,100 @@ struct StatsView: View {
                     Divider().frame(height: 52)
                     statTile(value: "\(longestStreak)", label: "Best streak", symbol: "flame.fill")
                     Divider().frame(height: 52)
-                    statTile(value: "\(totalCompletions)", label: "Check-ins", symbol: "checkmark.seal.fill")
+                    statTile(value: "\(totalCompletions)", label: "Steps", symbol: "checkmark.seal.fill")
                 }
             }
         }
+    }
+
+    // MARK: - Achievement archive
+
+    private var achievementArchive: some View {
+        VStack(alignment: .leading, spacing: Theme.Spacing.m) {
+            if let nextAchievement {
+                nextArtifact(nextAchievement)
+            } else {
+                archiveComplete
+            }
+
+            ScrollView(.horizontal) {
+                LazyHStack(spacing: Theme.Spacing.m) {
+                    ForEach(achievementProgress) { progress in
+                        AchievementCard(
+                            progress: progress,
+                            namespace: achievementNamespace,
+                            action: { selectedAchievement = progress }
+                        )
+                        .escherScrollDepth(axis: .horizontal)
+                    }
+                }
+                .scrollTargetLayout()
+                .padding(.vertical, 2)
+                .padding(.horizontal, 1)
+            }
+            .contentMargins(.horizontal, 1, for: .scrollContent)
+            .scrollTargetBehavior(.viewAligned)
+            .scrollIndicators(.hidden)
+        }
+    }
+
+    private func nextArtifact(_ progress: AchievementProgress) -> some View {
+        Group {
+            if dynamicTypeSize.isAccessibilitySize {
+                VStack(alignment: .leading, spacing: Theme.Spacing.m) {
+                    AchievementArtwork(progress: progress, size: 160)
+                        .frame(maxWidth: .infinity)
+                    nextArtifactCopy(progress)
+                }
+            } else {
+                HStack(spacing: Theme.Spacing.l) {
+                    AchievementArtwork(progress: progress, size: 104)
+                    nextArtifactCopy(progress)
+                    Spacer(minLength: 0)
+                }
+            }
+        }
+        .padding(Theme.Spacing.l)
+        .card()
+        .accessibilityElement(children: .combine)
+    }
+
+    private func nextArtifactCopy(_ progress: AchievementProgress) -> some View {
+        VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
+            Text("NEXT ARTIFACT")
+                .font(.caption2.weight(.bold))
+                .tracking(1.2)
+                .foregroundStyle(.secondary)
+            Text(progress.id.title)
+                .font(.headline)
+            Text(progress.id.requirement)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            ProgressView(value: progress.fraction)
+                .tint(.orange)
+            Text(progress.progressLabel)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private var archiveComplete: some View {
+        HStack(spacing: Theme.Spacing.m) {
+            Image(systemName: "sparkles")
+                .font(.title2)
+                .foregroundStyle(.orange)
+            VStack(alignment: .leading, spacing: 3) {
+                Text("The archive is whole")
+                    .font(.headline)
+                Text("Every impossible artifact has been discovered.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(Theme.Spacing.l)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .card()
     }
 
     private func statTile(value: String, label: String, symbol: String) -> some View {
@@ -219,7 +325,7 @@ struct StatsView: View {
                     .accessibilityElement(children: .combine)
                     .accessibilityLabel(item.goalCount == 0
                                         ? "\(item.emotion.displayName), unexplored"
-                                        : "\(item.emotion.displayName), \(item.checkIns) check-ins in the last 30 days")
+                                        : "\(item.emotion.displayName), \(item.checkIns) steps in the last 30 days")
                 }
             }
             .padding(.vertical, 2)
@@ -300,6 +406,31 @@ struct StatsView: View {
 
     private var totalCompletions: Int {
         active.reduce(0) { $0 + $1.completions.count }
+    }
+
+    private var achievementProgress: [AchievementProgress] {
+        let values = AchievementEngine.progress(
+            in: AchievementSnapshot(goals: active, calendar: calendar),
+            unlocked: Set(achievementUnlocks.compactMap(\.achievement)),
+            asOf: .now,
+            calendar: calendar
+        )
+        return AchievementID.allCases.compactMap { values[$0] }
+    }
+
+    private var unlockedAchievementCount: Int {
+        achievementProgress.filter(\.isUnlocked).count
+    }
+
+    private var nextAchievement: AchievementProgress? {
+        achievementProgress
+            .filter { !$0.isUnlocked }
+            .sorted {
+                if $0.fraction != $1.fraction { return $0.fraction > $1.fraction }
+                return (AchievementID.allCases.firstIndex(of: $0.id) ?? 0)
+                    < (AchievementID.allCases.firstIndex(of: $1.id) ?? 0)
+            }
+            .first
     }
 
     private var streakRanking: [(Goal, StreakResult)] {

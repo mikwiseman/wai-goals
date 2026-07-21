@@ -270,14 +270,17 @@ struct CompletionJourneyMoment: Identifiable, Equatable {
     let emotion: GoalEmotion
     let progressLabel: String
     let milestone: String?
+    let achievements: [AchievementProgress]
 
     init(goalTitle: String, emotion: GoalEmotion, progressLabel: String,
-         milestone: String? = nil, id: UUID = UUID()) {
+         milestone: String? = nil, achievements: [AchievementProgress] = [],
+         id: UUID = UUID()) {
         self.id = id
         self.goalTitle = goalTitle
         self.emotion = emotion
         self.progressLabel = progressLabel
         self.milestone = milestone
+        self.achievements = achievements
     }
 }
 
@@ -289,6 +292,7 @@ struct GoalCompletionJourney: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var revealed = false
     @State private var glow = false
+    @State private var artifactRevealed = false
 
     var body: some View {
         ZStack {
@@ -362,6 +366,15 @@ struct GoalCompletionJourney: View {
             .frame(maxWidth: 354)
 
             progressPips
+
+            if !moment.achievements.isEmpty {
+                AchievementDiscoveryCard(
+                    achievements: moment.achievements,
+                    revealed: artifactRevealed
+                )
+                .frame(maxWidth: 354)
+                .animation(reduceMotion ? nil : WaiMotion.reveal, value: artifactRevealed)
+            }
 
             Button("Continue", action: onDismiss)
                 .fontWeight(.semibold)
@@ -443,6 +456,7 @@ struct GoalCompletionJourney: View {
     private func start() {
         guard !reduceMotion else {
             revealed = true
+            artifactRevealed = true
             return
         }
         withAnimation(WaiMotion.reveal) {
@@ -450,6 +464,12 @@ struct GoalCompletionJourney: View {
         }
         withAnimation(.easeOut(duration: 1.2)) {
             glow = true
+        }
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(720))
+            withAnimation(WaiMotion.reveal) {
+                artifactRevealed = true
+            }
         }
     }
 }

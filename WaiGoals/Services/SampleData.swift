@@ -13,6 +13,7 @@ enum SampleData {
     }
 
     static func wipe(_ context: ModelContext) {
+        try? context.delete(model: AchievementUnlock.self)
         try? context.delete(model: Intention.self)
         try? context.delete(model: Completion.self)
         try? context.delete(model: Goal.self)
@@ -31,9 +32,10 @@ enum SampleData {
             let reminder = reminderHour.map { hour in
                 calendar.date(bySettingHour: hour, minute: 0, second: 0, of: .now) ?? .now
             }
+            let createdAt = calendar.date(byAdding: .day, value: -120, to: .now) ?? .now
             let goal = Goal(title: title, symbol: symbol, color: color, emotion: emotion, schedule: schedule,
                             reminderEnabled: reminderHour != nil, reminderTime: reminder,
-                            sortIndex: index)
+                            sortIndex: index, createdAt: createdAt)
             index += 1
             context.insert(goal)
             return goal

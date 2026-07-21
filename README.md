@@ -22,7 +22,7 @@ A minimal, native iOS app for tracking the goals and habits that matter — *“
 - **One-tap completion** — a satisfying check with a spring animation and haptic feedback. The core action takes under a second.
 - **Forgiving, schedule-aware streaks** — current **and** best streak. Only the days you’re actually due count, an unfinished *today* is grace (never a broken streak), and your best is never erased by a single miss.
 - **Statistics** — a per-week completion ring, a GitHub-style **heatmap**, a 12-week **trend chart** (Swift Charts), completion rate, and a current-streak leaderboard.
-- **Milestone celebrations** — confetti and an encouraging message at 7, 30, 100… day streaks.
+- **Impossible artifacts** — eight Escher-inspired achievements for a first step, kept intentions, returning after a miss, meaningful streaks, 100 real actions, and exploring every emotional world.
 - **Per-goal reminders** — local notifications at a time you choose; tapping one opens that goal.
 - **Local-only & private** — everything lives on device via SwiftData. No account, no cloud, no tracking.
 - **Polished by default** — full Dark Mode, Dynamic Type, VoiceOver labels, Reduce Motion / Reduce Transparency support, and 44pt touch targets throughout.
@@ -37,21 +37,21 @@ A minimal, native iOS app for tracking the goals and habits that matter — *“
 
 Modern SwiftUI “MV”, with logic kept out of the views so it’s trivially testable:
 
-- **Models** (`@Model`) — `Goal`, `Completion`, `Intention`. Enum-like fields are stored as primitives and bridged to value types to avoid SwiftData’s Codable-enum pitfalls.
-- **Logic** (pure value types, fully unit-tested) — `Schedule`, `Weekday`, `StreakCalculator`, `StatsCalculator`. No SwiftData, no UIKit — just dates in, numbers out.
+- **Models** (`@Model`) — `Goal`, `Completion`, `Intention`, `AchievementUnlock`. Achievement progress remains derived from real history; the unlock record preserves earned ownership and prevents duplicate celebrations.
+- **Logic** (pure value types, fully unit-tested) — `Schedule`, `Weekday`, `StreakCalculator`, `StatsCalculator`, `AchievementEngine`. No SwiftData or UI behavior inside the calculators — just dates in, progress out.
 - **Services** — `NotificationScheduler` (`@Observable`, syncs reminders on every change), `NotificationCoordinator` (foreground presentation + tap routing), `SampleData`, `Haptics`.
-- **Design System** — `Theme`, `AccentToken`, and reusable components (progress ring, streak badge, completion button, heatmap day-dot, milestone overlay, confetti).
-- **Features** — `Today`, `Goals` (+ detail, editor, heatmap, symbol picker), `Stats`, `Settings`.
+- **Design System** — `Theme`, `AccentToken`, Escher world motion, and reusable progress, streak, completion, heatmap, and artifact components.
+- **Features** — `Today`, `Goals` (+ detail, editor, heatmap, symbol picker), `Achievements`, `Stats`, `Settings`.
 
 ```
 WaiGoals/
   App/            WaiGoalsApp.swift · RootView.swift
-  Models/         Goal · Completion · Intention · Schedule · Weekday · Goal+Actions
-  Logic/          StreakCalculator · StatsCalculator
+  Models/         Goal · Completion · Intention · AchievementUnlock · Schedule · Weekday · Goal+Actions
+  Logic/          StreakCalculator · StatsCalculator · AchievementEngine
   Services/       NotificationScheduler · NotificationCoordinator · AppSettings · Haptics · SampleData · AppLaunch · ModelContext+Persistence
   DesignSystem/   Theme · AccentToken · Components
-  Features/       Today · Goals · Stats · Settings
-WaiGoalsTests/    Schedule · Streak · Stats · Consistency  (Swift Testing)
+  Features/       Today · Goals · Achievements · Stats · Settings
+WaiGoalsTests/    Schedule · Streak · Stats · Achievements · Consistency  (Swift Testing)
 ```
 
 ## Tech stack
@@ -70,11 +70,11 @@ open WaiGoals.xcodeproj         # then ⌘R, or:
 xcodebuild -scheme WaiGoals -destination 'platform=iOS Simulator,name=iPhone 17 Pro' build
 ```
 
-Launch arguments (development / screenshots): `-seedSampleData`, `-tab today|goals|stats`, `-open editor|settings|detail|milestone`.
+Launch arguments (development / screenshots): `-seedSampleData`, `-tab today|goals|stats`, `-open editor|settings|detail|milestone|achievement`.
 
 ## Testing
 
-27 unit tests cover the streak and statistics engine — schedule logic, forgiving grace, week/timezone boundaries, and heatmap/streak consistency:
+54 unit tests cover schedules, streaks, statistics, achievement consistency, comeback detection, durable ownership, week/timezone boundaries, and compiled artwork assets:
 
 ```bash
 xcodebuild -scheme WaiGoals -destination 'platform=iOS Simulator,name=iPhone 17 Pro' test

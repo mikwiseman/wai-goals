@@ -99,6 +99,19 @@ struct TodayView: View {
                         progressLabel: "A new stair is visible",
                         milestone: "30 days in a row"
                     )
+                case "achievement":
+                    completionMoment = CompletionJourneyMoment(
+                        goalTitle: allGoals.first?.title ?? "Your goal",
+                        emotion: allGoals.first?.emotion ?? .growth,
+                        progressLabel: "A real step moved the path",
+                        achievements: [
+                            AchievementProgress(
+                                id: .atlasMaker,
+                                currentValue: 100,
+                                targetValue: 100
+                            )
+                        ]
+                    )
                 default: break
                 }
             }
@@ -229,7 +242,7 @@ struct TodayView: View {
                 Group {
                     if dynamicTypeSize.isAccessibilitySize {
                         VStack(alignment: .leading, spacing: Theme.Spacing.xxs) {
-                            Text(doneCount == total ? "Every world moved forward" : "\(doneCount) of \(total) stairs climbed")
+                            Text(doneCount == total ? "Every world moved forward" : "\(doneCount) of \(total) steps complete")
                             Text(fraction.formatted(.percent.precision(.fractionLength(0))))
                                 .monospacedDigit()
                                 .contentTransition(.numericText())
@@ -237,7 +250,7 @@ struct TodayView: View {
                         .font(.subheadline.weight(.semibold))
                     } else {
                         HStack(alignment: .firstTextBaseline) {
-                            Text(doneCount == total ? "Every world moved forward" : "\(doneCount) of \(total) stairs climbed")
+                            Text(doneCount == total ? "Every world moved forward" : "\(doneCount) of \(total) steps complete")
                                 .font(.subheadline.weight(.semibold))
                             Spacer()
                             Text(fraction.formatted(.percent.precision(.fractionLength(0))))
@@ -304,25 +317,53 @@ struct TodayView: View {
     }
 
     private func toggle(_ goal: Goal) {
+        let before = AchievementSnapshot(goals: allGoals, calendar: calendar)
         let wasDone = goal.isCompleted(on: today, calendar: calendar)
+        let completedBeforeToggle = doneCount
         let newStreak = goal.toggleCompletion(on: today, context: context, calendar: calendar)
+        let achievements = wasDone ? [] : AchievementEngine.newlyUnlocked(
+            before: before,
+            after: before.addingCompletion(to: goal.id, on: today, calendar: calendar),
+            excluding: Set(context.allAchievementUnlocks().compactMap(\.achievement)),
+            asOf: today,
+            calendar: calendar
+        )
+        AchievementUnlockStore.record(achievements.map(\.id), context: context)
+        let completedToday = wasDone
+            ? max(completedBeforeToggle - 1, 0)
+            : min(completedBeforeToggle + 1, dueGoals.count)
+
         if let newStreak, Milestone.reached(newStreak) {
             Haptics.success()
             if let emotion = goal.emotion {
                 showCompletion(goal: goal, emotion: emotion,
-                               milestone: "\(newStreak) \(goal.schedule.streakUnit.label(for: newStreak)) in a row")
+                               milestone: "\(newStreak) \(goal.schedule.streakUnit.label(for: newStreak)) in a row",
+                               achievements: achievements,
+                               completedToday: completedToday)
             }
         } else if !wasDone, let emotion = goal.emotion {
-            showCompletion(goal: goal, emotion: emotion)
+            showCompletion(
+                goal: goal,
+                emotion: emotion,
+                achievements: achievements,
+                completedToday: completedToday
+            )
         }
     }
 
-    private func showCompletion(goal: Goal, emotion: GoalEmotion, milestone: String? = nil) {
+    private func showCompletion(
+        goal: Goal,
+        emotion: GoalEmotion,
+        milestone: String? = nil,
+        achievements: [AchievementProgress] = [],
+        completedToday: Int
+    ) {
         let moment = CompletionJourneyMoment(
             goalTitle: goal.title,
             emotion: emotion,
-            progressLabel: "\(doneCount) of \(dueGoals.count) today",
-            milestone: milestone
+            progressLabel: "\(completedToday) of \(dueGoals.count) steps today",
+            milestone: milestone,
+            achievements: achievements
         )
         if reduceMotion {
             completionMoment = moment

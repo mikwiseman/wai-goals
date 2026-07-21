@@ -3,6 +3,7 @@ import SwiftData
 
 struct GoalDetailView: View {
     @Bindable var goal: Goal
+    @Query(sort: \Goal.sortIndex) private var allGoals: [Goal]
 
     @Environment(\.modelContext) private var context
     @Environment(\.dismiss) private var dismiss
@@ -273,7 +274,7 @@ struct GoalDetailView: View {
                                   tint: tint, prominent: false)
                         Divider()
                         statBlock(value: "\(goal.completions.count)",
-                                  label: "Total done", symbol: "checkmark.seal.fill",
+                                  label: "Total steps", symbol: "checkmark.seal.fill",
                                   tint: tint, prominent: false)
                     }
                 } else {
@@ -283,7 +284,7 @@ struct GoalDetailView: View {
                                   tint: tint, prominent: false)
                         Divider().frame(height: 52)
                         statBlock(value: "\(goal.completions.count)",
-                                  label: "Total done", symbol: "checkmark.seal.fill",
+                                  label: "Total steps", symbol: "checkmark.seal.fill",
                                   tint: tint, prominent: false)
                     }
                 }
@@ -310,33 +311,54 @@ struct GoalDetailView: View {
     // MARK: - Actions
 
     private func toggleToday() {
+        let before = AchievementSnapshot(goals: allGoals, calendar: calendar)
         let wasDone = goal.isCompleted(on: today, calendar: calendar)
         let newStreak = goal.toggleCompletion(on: today, context: context, calendar: calendar)
+        let achievements = wasDone ? [] : AchievementEngine.newlyUnlocked(
+            before: before,
+            after: before.addingCompletion(to: goal.id, on: today, calendar: calendar),
+            excluding: Set(context.allAchievementUnlocks().compactMap(\.achievement)),
+            asOf: today,
+            calendar: calendar
+        )
+        AchievementUnlockStore.record(achievements.map(\.id), context: context)
+
+        var completed = goal.completedDays(calendar: calendar)
+        if !wasDone { completed.insert(today) }
+        let week = StatsCalculator.currentWeekProgress(
+            schedule: goal.schedule,
+            completedDays: completed,
+            asOf: today,
+            calendar: calendar
+        )
+
         if let newStreak, Milestone.reached(newStreak) {
             Haptics.success()
             if let emotion = goal.emotion {
                 showCompletion(
                     emotion,
-                    milestone: "\(newStreak) \(goal.schedule.streakUnit.label(for: newStreak)) in a row"
+                    milestone: "\(newStreak) \(goal.schedule.streakUnit.label(for: newStreak)) in a row",
+                    achievements: achievements,
+                    week: week
                 )
             }
         } else if !wasDone, let emotion = goal.emotion {
-            showCompletion(emotion)
+            showCompletion(emotion, achievements: achievements, week: week)
         }
     }
 
-    private func showCompletion(_ emotion: GoalEmotion, milestone: String? = nil) {
-        let week = StatsCalculator.currentWeekProgress(
-            schedule: goal.schedule,
-            completedDays: goal.completedDays(calendar: calendar),
-            asOf: today,
-            calendar: calendar
-        )
+    private func showCompletion(
+        _ emotion: GoalEmotion,
+        milestone: String? = nil,
+        achievements: [AchievementProgress] = [],
+        week: StatsCalculator.PeriodProgress
+    ) {
         let moment = CompletionJourneyMoment(
             goalTitle: goal.title,
             emotion: emotion,
-            progressLabel: "\(week.done) of \(week.total) this week",
-            milestone: milestone
+            progressLabel: "\(week.done) of \(week.total) steps this week",
+            milestone: milestone,
+            achievements: achievements
         )
         if reduceMotion {
             completionMoment = moment

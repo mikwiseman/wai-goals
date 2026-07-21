@@ -7,7 +7,12 @@ struct WaiGoalsApp: App {
 
     init() {
         do {
-            container = try ModelContainer(for: Goal.self, Completion.self, Intention.self)
+            container = try ModelContainer(
+                for: Goal.self,
+                Completion.self,
+                Intention.self,
+                AchievementUnlock.self
+            )
         } catch {
             // Persistence is foundational; surface the failure loudly rather
             // than silently degrading to a broken state.

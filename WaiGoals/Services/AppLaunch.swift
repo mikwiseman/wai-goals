@@ -15,7 +15,7 @@ enum AppLaunch {
         value(for: "-tab").flatMap(AppTab.init(rawValue:)) ?? .today
     }
 
-    /// "editor", "settings", or "detail".
+    /// "editor", "settings", "detail", "milestone", or "achievement".
     static var openTarget: String? { value(for: "-open") }
 
     private static func value(for flag: String) -> String? {
