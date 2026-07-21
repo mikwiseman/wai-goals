@@ -56,7 +56,7 @@
 - `xcodegen generate`: passed.
 - `git diff --check`: passed.
 - All generated `Contents.json` files: passed `jq empty`.
-- Xcode simulator tests: 36 passed, 0 failed, 0 skipped.
+- Xcode test suite (Designed for iPhone/iPad destination): 54 passed, 0 failed, 0 skipped.
 - Final simulator build and launch: passed.
 - Final build and runtime logs: no fatal, assertion, crash, uncaught, error, or failed matches.
 - Light, dark, maximum Dynamic Type, and Reduce Motion states: exercised on the running simulator.
