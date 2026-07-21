@@ -10,9 +10,8 @@ struct TodayView: View {
 
     @State private var showingEditor = false
     @State private var showingSettings = false
-    @State private var milestone: MilestoneInfo?
-    @State private var completionEmotion: GoalEmotion?
-    @State private var completionID = UUID()
+    @State private var completionMoment: CompletionJourneyMoment?
+    @State private var selectedGoalID: UUID?
     @State private var deepLinkedGoal: Goal?
     @State private var intentionGoal: Goal?
     @State private var didHandleLaunch = false
@@ -40,10 +39,6 @@ struct TodayView: View {
 
     private var pendingGoals: [Goal] {
         dueGoals.filter { !$0.isCompleted(on: today, calendar: calendar) }
-    }
-
-    private var intendedPendingCount: Int {
-        pendingGoals.filter { $0.hasIntention(on: today, calendar: calendar) }.count
     }
 
     var body: some View {
@@ -97,28 +92,25 @@ struct TodayView: View {
                 case "editor": showingEditor = true
                 case "settings": showingSettings = true
                 case "detail": deepLinkedGoal = allGoals.first { !$0.isArchived }
-                case "milestone": milestone = MilestoneInfo(streak: 30, unit: .day, accent: .teal, emotion: .growth)
+                case "milestone":
+                    completionMoment = CompletionJourneyMoment(
+                        goalTitle: allGoals.first?.title ?? "Your goal",
+                        emotion: allGoals.first?.emotion ?? .growth,
+                        progressLabel: "A new stair is visible",
+                        milestone: "30 days in a row"
+                    )
                 default: break
                 }
             }
         }
+        .toolbar(completionMoment == nil ? .visible : .hidden, for: .tabBar)
         .overlay {
-            ZStack {
-                if let completionEmotion {
-                    EmotionCompletionOverlay(emotion: completionEmotion)
-                        .transition(.scale(scale: 0.88).combined(with: .opacity))
+            if let completionMoment {
+                GoalCompletionJourney(moment: completionMoment) {
+                    dismissCompletion()
                 }
-                if let milestone {
-                    MilestoneOverlay(streak: milestone.streak, unit: milestone.unit,
-                                     tint: milestone.accent.color, emotion: milestone.emotion) {
-                        if reduceMotion {
-                            self.milestone = nil
-                        } else {
-                            withAnimation { self.milestone = nil }
-                        }
-                    }
-                    .transition(.opacity)
-                }
+                .transition(reduceMotion ? .opacity : .opacity.combined(with: .scale(scale: 1.04)))
+                .zIndex(20)
             }
         }
     }
@@ -196,114 +188,119 @@ struct TodayView: View {
     private var hero: some View {
         let total = dueGoals.count
         let fraction = total == 0 ? 0 : Double(doneCount) / Double(total)
-        let allDone = total > 0 && doneCount == total
-        let pending = pendingGoals.count
-        let intended = intendedPendingCount
-        let emotion = featuredEmotion
-        return VStack(alignment: .leading, spacing: Theme.Spacing.l) {
-            heroLead(emotion: emotion, total: total, allDone: allDone,
-                     pending: pending, intended: intended)
-
-            VStack(spacing: Theme.Spacing.xs) {
-                ProgressView(value: fraction)
-                    .tint(.accentColor)
-                HStack {
-                    Text(total == 0 ? "No steps today" : "\(doneCount) of \(total) steps complete")
-                    Spacer()
-                    Text(fraction.formatted(.percent.precision(.fractionLength(0))))
-                        .monospacedDigit()
+        return VStack(alignment: .leading, spacing: Theme.Spacing.m) {
+            if sortedDue.isEmpty {
+                EscherWorldStage(
+                    emotion: nil,
+                    title: "An open step",
+                    eyebrow: "Today’s observatory",
+                    message: "No goal needs your attention today.",
+                    progress: 0,
+                    height: 354
+                )
+            } else {
+                TabView(selection: $selectedGoalID) {
+                    ForEach(sortedDue) { goal in
+                        let done = goal.isCompleted(on: today, calendar: calendar)
+                        EscherWorldStage(
+                            emotion: goal.emotion,
+                            title: goal.title,
+                            eyebrow: done ? "Step complete" : "Today’s next stair",
+                            message: goal.emotion?.worldPrompt ?? goal.schedule.summary(calendar: calendar),
+                            progress: fraction,
+                            isComplete: done,
+                            height: 382,
+                            actionTitle: done
+                                ? (dynamicTypeSize.isAccessibilitySize ? "Open" : "Open this world")
+                                : (dynamicTypeSize.isAccessibilitySize ? "Complete" : "Complete this step"),
+                            actionSymbol: done ? "arrow.up.right" : "checkmark",
+                            action: done ? { deepLinkedGoal = goal } : { toggle(goal) }
+                        )
+                        .padding(.horizontal, 1)
+                        .tag(Optional(goal.id))
+                    }
                 }
-                .font(.caption.weight(.medium))
+                .tabViewStyle(.page(indexDisplayMode: .never))
+                .frame(height: dynamicTypeSize.isAccessibilitySize ? 820 : 382)
+                .animation(reduceMotion ? nil : WaiMotion.spatial, value: selectedGoalID)
+
+                worldRail
+
+                Group {
+                    if dynamicTypeSize.isAccessibilitySize {
+                        VStack(alignment: .leading, spacing: Theme.Spacing.xxs) {
+                            Text(doneCount == total ? "Every world moved forward" : "\(doneCount) of \(total) stairs climbed")
+                            Text(fraction.formatted(.percent.precision(.fractionLength(0))))
+                                .monospacedDigit()
+                                .contentTransition(.numericText())
+                        }
+                        .font(.subheadline.weight(.semibold))
+                    } else {
+                        HStack(alignment: .firstTextBaseline) {
+                            Text(doneCount == total ? "Every world moved forward" : "\(doneCount) of \(total) stairs climbed")
+                                .font(.subheadline.weight(.semibold))
+                            Spacer()
+                            Text(fraction.formatted(.percent.precision(.fractionLength(0))))
+                                .font(.caption.weight(.bold))
+                                .monospacedDigit()
+                                .contentTransition(.numericText())
+                        }
+                    }
+                }
                 .foregroundStyle(.secondary)
             }
         }
-        .padding(Theme.Spacing.xl)
-        .frame(maxWidth: .infinity)
-        .card(cornerRadius: Theme.Radius.hero)
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("Today's progress")
-        .accessibilityValue(heroAccessibilityValue(total: total, allDone: allDone,
-                                                   pending: pending, intended: intended))
+        .onAppear(perform: selectInitialGoal)
+        .onChange(of: sortedDue.map(\.id)) { _, ids in
+            if let selectedGoalID, ids.contains(selectedGoalID) { return }
+            selectInitialGoal()
+        }
     }
 
-    @ViewBuilder
-    private func heroLead(emotion: GoalEmotion?, total: Int, allDone: Bool,
-                          pending: Int, intended: Int) -> some View {
-        if dynamicTypeSize.isAccessibilitySize {
-            VStack(alignment: .leading, spacing: Theme.Spacing.l) {
-                heroArtwork(emotion: emotion)
-                    .frame(maxWidth: .infinity)
-                heroCopy(emotion: emotion, total: total, allDone: allDone,
-                         pending: pending, intended: intended)
+    private var worldRail: some View {
+        ScrollView(.horizontal) {
+            HStack(spacing: Theme.Spacing.s) {
+                ForEach(sortedDue) { goal in
+                    let selected = selectedGoalID == goal.id
+                    let done = goal.isCompleted(on: today, calendar: calendar)
+                    Button {
+                        if reduceMotion {
+                            selectedGoalID = goal.id
+                        } else {
+                            withAnimation(WaiMotion.spatial) { selectedGoalID = goal.id }
+                        }
+                    } label: {
+                        ZStack(alignment: .bottomTrailing) {
+                            if let emotion = goal.emotion {
+                                EmotionArtwork(emotion: emotion, size: selected ? 52 : 44)
+                            } else {
+                                GoalIcon(symbol: goal.symbol, tint: goal.accent.color,
+                                         size: selected ? 52 : 44)
+                            }
+                            if done {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .font(.caption.weight(.bold))
+                                    .foregroundStyle(.white, goal.accent.color)
+                                    .background(Circle().fill(Color(.systemBackground)))
+                                    .offset(x: 3, y: 3)
+                                    .dynamicTypeSize(.large)
+                            }
+                        }
+                        .padding(3)
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                .strokeBorder(selected ? goal.accent.color : .clear, lineWidth: 2)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(goal.title)
+                    .accessibilityAddTraits(selected ? .isSelected : [])
+                }
             }
-        } else {
-            HStack(spacing: Theme.Spacing.l) {
-                heroArtwork(emotion: emotion)
-                heroCopy(emotion: emotion, total: total, allDone: allDone,
-                         pending: pending, intended: intended)
-                Spacer(minLength: 0)
-            }
+            .padding(.horizontal, 2)
+            .padding(.vertical, 3)
         }
-    }
-
-    @ViewBuilder
-    private func heroArtwork(emotion: GoalEmotion?) -> some View {
-        if let emotion {
-            EmotionArtwork(emotion: emotion, size: 92, animated: true, decorative: false)
-        } else {
-            GoalJourneyArtwork(size: 88)
-        }
-    }
-
-    private func heroCopy(emotion: GoalEmotion?, total: Int, allDone: Bool,
-                          pending: Int, intended: Int) -> some View {
-        VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
-            Text(heroTitle(total: total, allDone: allDone, pending: pending, intended: intended))
-                .font(.title3.weight(.semibold))
-            Text(heroMessage(total: total, allDone: allDone, pending: pending, intended: intended))
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-            if let emotion {
-                Text("Toward \(emotion.displayName.lowercased()) · \(emotion.feeling)")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.tint)
-            }
-        }
-    }
-
-    private func heroTitle(total: Int, allDone: Bool, pending: Int, intended: Int) -> String {
-        if allDone { return "Every goal moved forward" }
-        if total == 0 { return "An open step" }
-        if pending > 0 && intended == pending { return "The path is set" }
-        if intended > 0 { return "Momentum has started" }
-        return "Move a goal forward"
-    }
-
-    private func heroMessage(total: Int, allDone: Bool, pending: Int, intended: Int) -> String {
-        if allDone { return "You reached every point you set for today." }
-        if total == 0 { return "No goal needs your attention today." }
-        if pending > 0 && intended == pending {
-            return "Every remaining goal has a clear intention."
-        }
-        if intended > 0 {
-            return "\(intended) of \(pending) remaining \(pending == 1 ? "goal has" : "goals have") a clear intention."
-        }
-        return "\(pending) \(pending == 1 ? "goal is" : "goals are") ready for one deliberate step."
-    }
-
-    private func heroAccessibilityValue(total: Int, allDone: Bool, pending: Int, intended: Int) -> String {
-        if allDone { return "All \(total) goals complete" }
-        if total == 0 { return "No goals scheduled today" }
-        return "\(doneCount) of \(total) goals complete, \(intended) of \(pending) pending goals have intentions"
-    }
-
-    private var featuredEmotion: GoalEmotion? {
-        pendingGoals
-            .first(where: { $0.hasIntention(on: today, calendar: calendar) && $0.emotion != nil })?
-            .emotion
-            ?? pendingGoals.compactMap(\.emotion).first
-            ?? dueGoals.compactMap(\.emotion).first
+        .scrollIndicators(.hidden)
     }
 
     private func toggle(_ goal: Goal) {
@@ -311,40 +308,42 @@ struct TodayView: View {
         let newStreak = goal.toggleCompletion(on: today, context: context, calendar: calendar)
         if let newStreak, Milestone.reached(newStreak) {
             Haptics.success()
-            let info = MilestoneInfo(streak: newStreak, unit: goal.schedule.streakUnit,
-                                     accent: goal.accent, emotion: goal.emotion)
-            if reduceMotion {
-                milestone = info
-            } else {
-                withAnimation {
-                    milestone = info
-                }
+            if let emotion = goal.emotion {
+                showCompletion(goal: goal, emotion: emotion,
+                               milestone: "\(newStreak) \(goal.schedule.streakUnit.label(for: newStreak)) in a row")
             }
         } else if !wasDone, let emotion = goal.emotion {
-            showCompletion(emotion)
+            showCompletion(goal: goal, emotion: emotion)
         }
     }
 
-    private func showCompletion(_ emotion: GoalEmotion) {
-        let id = UUID()
-        completionID = id
+    private func showCompletion(goal: Goal, emotion: GoalEmotion, milestone: String? = nil) {
+        let moment = CompletionJourneyMoment(
+            goalTitle: goal.title,
+            emotion: emotion,
+            progressLabel: "\(doneCount) of \(dueGoals.count) today",
+            milestone: milestone
+        )
         if reduceMotion {
-            completionEmotion = emotion
+            completionMoment = moment
         } else {
-            withAnimation(.spring(response: 0.34, dampingFraction: 0.78)) {
-                completionEmotion = emotion
+            withAnimation(WaiMotion.reveal) {
+                completionMoment = moment
             }
         }
-        Task { @MainActor in
-            try? await Task.sleep(for: .seconds(1.35))
-            guard completionID == id else { return }
-            if reduceMotion {
-                completionEmotion = nil
-            } else {
-                withAnimation(.easeOut(duration: 0.22)) {
-                    completionEmotion = nil
-                }
+    }
+
+    private func dismissCompletion() {
+        if reduceMotion {
+            completionMoment = nil
+        } else {
+            withAnimation(.easeOut(duration: 0.24)) {
+                completionMoment = nil
             }
         }
+    }
+
+    private func selectInitialGoal() {
+        selectedGoalID = pendingGoals.first?.id ?? sortedDue.first?.id
     }
 }

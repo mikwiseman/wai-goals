@@ -11,9 +11,7 @@ struct GoalDetailView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     @State private var showingEditor = false
-    @State private var milestone: MilestoneInfo?
-    @State private var completionEmotion: GoalEmotion?
-    @State private var completionID = UUID()
+    @State private var completionMoment: CompletionJourneyMoment?
     @State private var showingDeleteConfirm = false
     @State private var showingIntention = false
 
@@ -67,6 +65,7 @@ struct GoalDetailView: View {
                 }
             }
         }
+        .toolbar(completionMoment == nil ? .visible : .hidden, for: .tabBar)
         .confirmationDialog("Delete this goal?", isPresented: $showingDeleteConfirm, titleVisibility: .visible) {
             Button("Delete “\(goal.title)”", role: .destructive) { delete() }
             Button("Cancel", role: .cancel) {}
@@ -80,22 +79,12 @@ struct GoalDetailView: View {
             IntentionApprovalSheet(goal: goal, date: today, calendar: calendar)
         }
         .overlay {
-            ZStack {
-                if let completionEmotion {
-                    EmotionCompletionOverlay(emotion: completionEmotion)
-                        .transition(.scale(scale: 0.88).combined(with: .opacity))
+            if let completionMoment {
+                GoalCompletionJourney(moment: completionMoment) {
+                    dismissCompletion()
                 }
-                if let milestone {
-                    MilestoneOverlay(streak: milestone.streak, unit: milestone.unit,
-                                     tint: tint, emotion: milestone.emotion) {
-                        if reduceMotion {
-                            self.milestone = nil
-                        } else {
-                            withAnimation { self.milestone = nil }
-                        }
-                    }
-                    .transition(.opacity)
-                }
+                .transition(reduceMotion ? .opacity : .opacity.combined(with: .scale(scale: 1.04)))
+                .zIndex(20)
             }
         }
     }
@@ -103,33 +92,27 @@ struct GoalDetailView: View {
     // MARK: - Sections
 
     private func header(tint: Color) -> some View {
-        VStack(spacing: Theme.Spacing.l) {
-            ZStack(alignment: .bottomTrailing) {
-                if let emotion = goal.emotion {
-                    EmotionArtwork(emotion: emotion, size: 148, animated: true, decorative: false)
-                } else {
-                    GoalIcon(symbol: goal.symbol, tint: tint, size: 96)
-                }
-                if goal.emotion != nil {
-                    GoalIcon(symbol: goal.symbol, tint: tint, size: 40)
-                        .offset(x: 6, y: 6)
-                }
-            }
-            VStack(spacing: Theme.Spacing.xs) {
-                Text(goal.title)
-                    .font(.title2.weight(.bold))
-                    .multilineTextAlignment(.center)
-                Text(goal.schedule.summary(calendar: calendar))
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                if let emotion = goal.emotion {
-                    EmotionPill(emotion: emotion, showsFeeling: true)
-                        .padding(.top, Theme.Spacing.xxs)
-                }
-            }
+        let weekly = StatsCalculator.currentWeekProgress(
+            schedule: goal.schedule,
+            completedDays: goal.completedDays(calendar: calendar),
+            asOf: today,
+            calendar: calendar
+        )
+        let progress = weekly.total == 0 ? 0 : Double(weekly.done) / Double(weekly.total)
+        return EscherWorldStage(
+            emotion: goal.emotion,
+            title: goal.title,
+            eyebrow: "Inside this world",
+            message: goal.emotion?.worldPrompt ?? goal.schedule.summary(calendar: calendar),
+            progress: progress,
+            isComplete: goal.isCompleted(on: today, calendar: calendar),
+            height: 426
+        )
+        .overlay(alignment: .topLeading) {
+            GoalIcon(symbol: goal.symbol, tint: tint, size: 42)
+                .padding(Theme.Spacing.xl)
+                .padding(.top, Theme.Spacing.xxl)
         }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, Theme.Spacing.m)
     }
 
     private func markTodayButton(tint: Color) -> some View {
@@ -137,16 +120,26 @@ struct GoalDetailView: View {
         return Button {
             toggleToday()
         } label: {
-            Label(isDone ? "Done today" : "Mark done today",
-                  systemImage: isDone ? "checkmark.circle.fill" : "circle")
-                .font(.headline)
-                .frame(maxWidth: .infinity)
+            Group {
+                if reduceMotion {
+                    markTodayLabel(isDone: isDone)
+                } else {
+                    markTodayLabel(isDone: isDone)
+                        .symbolEffect(.bounce, value: isDone)
+                }
+            }
         }
         .waiGlassButton(prominent: true)
         .tint(tint)
         .controlSize(.large)
-        .symbolEffect(.bounce, value: isDone)
         .sensoryFeedback(trigger: isDone) { _, now in now ? .success : .impact(weight: .light) }
+    }
+
+    private func markTodayLabel(isDone: Bool) -> some View {
+        Label(isDone ? "Done today" : "Mark done today",
+              systemImage: isDone ? "checkmark.circle.fill" : "circle")
+            .font(.headline)
+            .frame(maxWidth: .infinity)
     }
 
     private func intentionCard(tint: Color) -> some View {
@@ -321,39 +314,45 @@ struct GoalDetailView: View {
         let newStreak = goal.toggleCompletion(on: today, context: context, calendar: calendar)
         if let newStreak, Milestone.reached(newStreak) {
             Haptics.success()
-            let info = MilestoneInfo(streak: newStreak, unit: goal.schedule.streakUnit,
-                                     accent: goal.accent, emotion: goal.emotion)
-            if reduceMotion {
-                milestone = info
-            } else {
-                withAnimation {
-                    milestone = info
-                }
+            if let emotion = goal.emotion {
+                showCompletion(
+                    emotion,
+                    milestone: "\(newStreak) \(goal.schedule.streakUnit.label(for: newStreak)) in a row"
+                )
             }
         } else if !wasDone, let emotion = goal.emotion {
             showCompletion(emotion)
         }
     }
 
-    private func showCompletion(_ emotion: GoalEmotion) {
-        let id = UUID()
-        completionID = id
+    private func showCompletion(_ emotion: GoalEmotion, milestone: String? = nil) {
+        let week = StatsCalculator.currentWeekProgress(
+            schedule: goal.schedule,
+            completedDays: goal.completedDays(calendar: calendar),
+            asOf: today,
+            calendar: calendar
+        )
+        let moment = CompletionJourneyMoment(
+            goalTitle: goal.title,
+            emotion: emotion,
+            progressLabel: "\(week.done) of \(week.total) this week",
+            milestone: milestone
+        )
         if reduceMotion {
-            completionEmotion = emotion
+            completionMoment = moment
         } else {
-            withAnimation(.spring(response: 0.34, dampingFraction: 0.78)) {
-                completionEmotion = emotion
+            withAnimation(WaiMotion.reveal) {
+                completionMoment = moment
             }
         }
-        Task { @MainActor in
-            try? await Task.sleep(for: .seconds(1.35))
-            guard completionID == id else { return }
-            if reduceMotion {
-                completionEmotion = nil
-            } else {
-                withAnimation(.easeOut(duration: 0.22)) {
-                    completionEmotion = nil
-                }
+    }
+
+    private func dismissCompletion() {
+        if reduceMotion {
+            completionMoment = nil
+        } else {
+            withAnimation(.easeOut(duration: 0.24)) {
+                completionMoment = nil
             }
         }
     }

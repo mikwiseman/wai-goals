@@ -4,9 +4,11 @@ import SwiftData
 struct GoalsListView: View {
     @Environment(\.modelContext) private var context
     @Environment(NotificationScheduler.self) private var scheduler
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Query(sort: \Goal.sortIndex) private var goals: [Goal]
     @State private var showingEditor = false
     @State private var goalToDelete: Goal?
+    @Namespace private var navigationNamespace
 
     private let calendar = Calendar.current
     private var active: [Goal] { goals.filter { !$0.isArchived } }
@@ -59,10 +61,18 @@ struct GoalsListView: View {
             Section {
                 ForEach(active) { goal in
                     NavigationLink {
-                        GoalDetailView(goal: goal)
+                        goalDestination(goal)
                     } label: {
                         GoalListRow(goal: goal, calendar: calendar)
+                            .matchedTransitionSource(id: goal.id, in: navigationNamespace) { source in
+                                source
+                                    .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.card,
+                                                                style: .continuous))
+                                    .shadow(color: goal.accent.color.opacity(0.18), radius: 18, y: 9)
+                            }
                     }
+                    .buttonStyle(.plain)
+                    .escherScrollDepth()
                     .swipeActions(edge: .trailing) {
                         Button(role: .destructive) { goalToDelete = goal } label: {
                             Label("Delete", systemImage: "trash")
@@ -72,8 +82,10 @@ struct GoalsListView: View {
                         }
                         .tint(.gray)
                     }
-                    .listRowInsets(.init(top: Theme.Spacing.s, leading: Theme.Spacing.l,
-                                        bottom: Theme.Spacing.s, trailing: Theme.Spacing.l))
+                    .listRowInsets(.init(top: Theme.Spacing.xs, leading: Theme.pagePadding,
+                                        bottom: Theme.Spacing.xs, trailing: Theme.pagePadding))
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
                 }
                 .onMove(perform: move)
             } header: {
@@ -90,6 +102,7 @@ struct GoalsListView: View {
                     ForEach(archived) { goal in
                         GoalListRow(goal: goal, calendar: calendar)
                             .foregroundStyle(.secondary)
+                            .saturation(0.25)
                             .swipeActions(edge: .trailing) {
                                 Button(role: .destructive) { delete(goal) } label: {
                                     Label("Delete", systemImage: "trash")
@@ -99,8 +112,10 @@ struct GoalsListView: View {
                                 }
                                 .tint(.blue)
                             }
-                            .listRowInsets(.init(top: Theme.Spacing.s, leading: Theme.Spacing.l,
-                                                bottom: Theme.Spacing.s, trailing: Theme.Spacing.l))
+                            .listRowInsets(.init(top: Theme.Spacing.xs, leading: Theme.pagePadding,
+                                                bottom: Theme.Spacing.xs, trailing: Theme.pagePadding))
+                            .listRowBackground(Color.clear)
+                            .listRowSeparator(.hidden)
                     }
                 } header: {
                     HStack {
@@ -112,9 +127,20 @@ struct GoalsListView: View {
                 }
             }
         }
-        .listStyle(.insetGrouped)
+        .listStyle(.plain)
         .listSectionSpacing(Theme.Spacing.xl)
         .scrollContentBackground(.hidden)
+    }
+
+    @ViewBuilder
+    private func goalDestination(_ goal: Goal) -> some View {
+        if reduceMotion {
+            GoalDetailView(goal: goal)
+                .navigationTransition(.automatic)
+        } else {
+            GoalDetailView(goal: goal)
+                .navigationTransition(.zoom(sourceID: goal.id, in: navigationNamespace))
+        }
     }
 
     // MARK: - Mutations
@@ -160,10 +186,14 @@ struct GoalListRow: View {
         Group {
             if dynamicTypeSize.isAccessibilitySize {
                 VStack(alignment: .leading, spacing: Theme.Spacing.s) {
-                    HStack(alignment: .top, spacing: Theme.Spacing.m) {
-                        artwork(size: 52, tint: tint)
-                        Text(goal.title)
-                            .font(.body.weight(.semibold))
+                    artwork(size: 78, tint: tint)
+                    Text(goal.title)
+                        .font(.headline)
+                        .fixedSize(horizontal: false, vertical: true)
+                    if let emotion = goal.emotion {
+                        Text(emotion.worldPrompt)
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                     Text(metadata)
@@ -177,11 +207,17 @@ struct GoalListRow: View {
                 }
             } else {
                 HStack(spacing: Theme.Spacing.m) {
-                    artwork(size: 48, tint: tint)
-                    VStack(alignment: .leading, spacing: 3) {
+                    artwork(size: 82, tint: tint)
+                    VStack(alignment: .leading, spacing: 5) {
+                        if let emotion = goal.emotion {
+                            Text(emotion.displayName.uppercased())
+                                .font(.caption2.weight(.bold))
+                                .tracking(1.1)
+                                .foregroundStyle(emotion.worldTint)
+                        }
                         Text(goal.title)
-                            .font(.body.weight(.semibold))
-                            .lineLimit(1)
+                            .font(.headline)
+                            .lineLimit(2)
                         Text(metadata)
                             .font(.caption)
                             .foregroundStyle(.secondary)
@@ -195,7 +231,9 @@ struct GoalListRow: View {
                 }
             }
         }
-        .padding(.vertical, Theme.Spacing.xxs)
+        .padding(Theme.Spacing.m)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .card()
         .accessibilityElement(children: .combine)
     }
 

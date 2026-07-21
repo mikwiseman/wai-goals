@@ -69,27 +69,23 @@ struct GoalEditorView: View {
 
     private var previewSection: some View {
         Section {
-            VStack(spacing: Theme.Spacing.s) {
-                ZStack(alignment: .bottomTrailing) {
-                    if let emotion {
-                        EmotionArtwork(emotion: emotion, size: 104, animated: true)
-                    } else {
-                        GoalJourneyArtwork(size: 104)
-                    }
-                    GoalIcon(symbol: symbol, tint: accent.color, size: 36)
-                        .offset(x: 5, y: 5)
-                }
-                Text(title.isEmpty ? "New goal" : title)
-                    .font(.headline)
-                    .foregroundStyle(title.isEmpty ? .secondary : .primary)
-                if let emotion {
-                    Text("Toward \(emotion.displayName.lowercased()) · \(emotion.feeling)")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
+            EscherWorldStage(
+                emotion: emotion,
+                title: title.isEmpty ? "Name the next stair" : title,
+                eyebrow: editingGoal == nil ? "New world" : "Refine this world",
+                message: emotion?.worldPrompt ?? "Choose how you want this goal to change you.",
+                progress: 0,
+                height: 344
+            )
+            .id(emotion)
+            .transition(reduceMotion ? .opacity : .opacity.combined(with: .scale(scale: 0.96)))
+            .overlay(alignment: .topLeading) {
+                GoalIcon(symbol: symbol, tint: accent.color, size: 40)
+                    .padding(Theme.Spacing.xl)
+                    .padding(.top, Theme.Spacing.xxl)
             }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, Theme.Spacing.l)
+            .listRowInsets(.init(top: Theme.Spacing.s, leading: 0,
+                                bottom: Theme.Spacing.s, trailing: 0))
             .listRowBackground(Color.clear)
         }
     }
@@ -99,9 +95,9 @@ struct GoalEditorView: View {
             EmotionPicker(selection: $emotion, tint: accent.color)
                 .padding(.vertical, Theme.Spacing.xs)
         } header: {
-            Text("How do you want to feel?")
+            Text("Choose the world")
         } footer: {
-            Text("A goal is a way of becoming, not just a box to tick.")
+            Text("How do you want to feel as this goal becomes part of you?")
         }
     }
 

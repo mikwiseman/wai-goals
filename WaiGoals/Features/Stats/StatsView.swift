@@ -33,13 +33,11 @@ struct StatsView: View {
                 summarySurface
                     .entranceMotion(order: 0)
 
-                if !emotionMomentum.isEmpty {
-                    VStack(alignment: .leading, spacing: Theme.Spacing.m) {
-                        SectionHeading(title: "Emotional momentum", detail: "Last 30 days")
-                        emotionMomentumStrip
-                    }
-                    .entranceMotion(order: 1)
+                VStack(alignment: .leading, spacing: Theme.Spacing.m) {
+                    SectionHeading(title: "Your impossible atlas", detail: "8 emotional worlds")
+                    emotionMomentumStrip
                 }
+                .entranceMotion(order: 1)
 
                 VStack(alignment: .leading, spacing: Theme.Spacing.m) {
                     SectionHeading(title: "Momentum", detail: "Last 12 weeks")
@@ -96,14 +94,17 @@ struct StatsView: View {
 
     private func weekProgressRing(fraction: Double) -> some View {
         ZStack {
-            ProgressRing(fraction: fraction, lineWidth: 11)
-                .frame(width: 84, height: 84)
+            EmotionArtwork(emotion: leadingEmotion, size: 100, animated: true)
+            ProgressRing(fraction: fraction, lineWidth: 7, tint: leadingEmotion.worldTint)
+                .frame(width: 112, height: 112)
             Text(fraction.formatted(.percent.precision(.fractionLength(0))))
-                .font(.system(.title2, design: .rounded).weight(.bold))
+                .font(.caption.weight(.heavy))
                 .monospacedDigit()
-                .lineLimit(1)
-                .minimumScaleFactor(0.35)
-                .frame(width: 68)
+                .foregroundStyle(.white)
+                .padding(.horizontal, 9)
+                .padding(.vertical, 6)
+                .background(.black.opacity(0.54), in: Capsule())
+                .offset(y: 31)
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("This week's completion")
@@ -178,20 +179,32 @@ struct StatsView: View {
         let maximum = max(emotionMomentum.map(\.checkIns).max() ?? 0, 1)
         return ScrollView(.horizontal) {
             HStack(spacing: Theme.Spacing.m) {
-                ForEach(Array(emotionMomentum.enumerated()), id: \.element.id) { index, item in
+                ForEach(emotionMomentum) { item in
                     VStack(alignment: .leading, spacing: Theme.Spacing.s) {
-                        HStack(alignment: .top) {
-                            EmotionArtwork(emotion: item.emotion, size: 66, decorative: false)
-                            Spacer(minLength: 0)
-                            Text("\(item.checkIns)")
-                                .font(.system(.title2, design: .rounded).weight(.bold))
-                                .monospacedDigit()
-                                .contentTransition(.numericText())
-                        }
+                        Image(decorative: item.emotion.assetName)
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 154, height: 154)
+                            .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.card, style: .continuous))
+                            .overlay(alignment: .topTrailing) {
+                                Text("\(item.checkIns)")
+                                    .font(.caption.weight(.heavy))
+                                    .monospacedDigit()
+                                    .foregroundStyle(.white)
+                                    .padding(.horizontal, 9)
+                                    .padding(.vertical, 6)
+                                    .background(.black.opacity(0.54), in: Capsule())
+                                    .padding(Theme.Spacing.xs)
+                                    .contentTransition(.numericText())
+                            }
+                            .saturation(item.goalCount == 0 ? 0.16 : 1)
+                            .opacity(item.goalCount == 0 ? 0.58 : 1)
+                            .shadow(color: item.emotion.worldTint.opacity(item.goalCount == 0 ? 0.08 : 0.34),
+                                    radius: 14, y: 8)
                         VStack(alignment: .leading, spacing: 3) {
                             Text(item.emotion.displayName)
-                                .font(.subheadline.weight(.semibold))
-                            Text(item.emotion.feeling)
+                                .font(.subheadline.weight(.bold))
+                            Text(item.goalCount == 0 ? "Unexplored" : item.emotion.feeling)
                                 .font(.caption2)
                                 .foregroundStyle(.secondary)
                                 .lineLimit(1)
@@ -200,11 +213,13 @@ struct StatsView: View {
                             .tint(.accentColor)
                     }
                     .padding(Theme.Spacing.m)
-                    .frame(width: dynamicTypeSize.isAccessibilitySize ? 276 : 176, alignment: .leading)
+                    .frame(width: dynamicTypeSize.isAccessibilitySize ? 286 : 186, alignment: .leading)
                     .card()
-                    .entranceMotion(order: index)
+                    .escherScrollDepth(axis: .horizontal)
                     .accessibilityElement(children: .combine)
-                    .accessibilityLabel("\(item.emotion.displayName), \(item.checkIns) check-ins in the last 30 days")
+                    .accessibilityLabel(item.goalCount == 0
+                                        ? "\(item.emotion.displayName), unexplored"
+                                        : "\(item.emotion.displayName), \(item.checkIns) check-ins in the last 30 days")
                 }
             }
             .padding(.vertical, 2)
@@ -311,26 +326,32 @@ struct StatsView: View {
         let today = calendar.startOfDay(for: .now)
         let start = calendar.date(byAdding: .day, value: -29, to: today) ?? today
 
-        return GoalEmotion.allCases.compactMap { emotion in
+        return GoalEmotion.allCases.map { emotion in
             let matchingGoals = active.filter { $0.emotion == emotion }
-            guard !matchingGoals.isEmpty else { return nil }
             let checkIns = matchingGoals.reduce(0) { total, goal in
                 total + goal.completions.filter {
                     let day = calendar.startOfDay(for: $0.day)
                     return day >= start && day <= today
                 }.count
             }
-            return EmotionMomentum(emotion: emotion, checkIns: checkIns)
+            return EmotionMomentum(emotion: emotion, checkIns: checkIns,
+                                   goalCount: matchingGoals.count)
         }
         .sorted {
+            if ($0.goalCount > 0) != ($1.goalCount > 0) { return $0.goalCount > 0 }
             if $0.checkIns != $1.checkIns { return $0.checkIns > $1.checkIns }
             return $0.emotion.displayName < $1.emotion.displayName
         }
+    }
+
+    private var leadingEmotion: GoalEmotion {
+        emotionMomentum.first(where: { $0.goalCount > 0 })?.emotion ?? .growth
     }
 }
 
 private struct EmotionMomentum: Identifiable {
     let emotion: GoalEmotion
     let checkIns: Int
+    let goalCount: Int
     var id: GoalEmotion { emotion }
 }

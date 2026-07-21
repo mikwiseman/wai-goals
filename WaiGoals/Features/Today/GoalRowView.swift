@@ -12,6 +12,7 @@ struct TodayGoalRow: View {
     let onIntend: () -> Void
     let onOpen: () -> Void
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         let tint = goal.accent.color
@@ -19,10 +20,8 @@ struct TodayGoalRow: View {
         Group {
             if dynamicTypeSize.isAccessibilitySize {
                 VStack(alignment: .leading, spacing: Theme.Spacing.m) {
-                    HStack(alignment: .top, spacing: Theme.Spacing.m) {
-                        completionButton(tint: tint)
-                        goalSummary(streak: streak, tint: tint, compact: false)
-                    }
+                    completionButton(tint: tint)
+                    goalSummary(streak: streak, tint: tint, compact: false)
                     if streak.current > 0 {
                         StreakBadge(count: streak.current, unit: streak.unit,
                                     tint: tint, showsLabel: true)
@@ -43,8 +42,20 @@ struct TodayGoalRow: View {
     }
 
     private func completionButton(tint: Color) -> some View {
-        CompletionButton(isDone: isDone, symbol: goal.symbol, tint: tint,
-                         size: 44, action: onToggle)
+        ZStack(alignment: .bottomTrailing) {
+            if let emotion = goal.emotion {
+                EmotionArtwork(emotion: emotion, size: 58, decorative: true)
+                    .opacity(isDone ? 0.58 : 1)
+                    .saturation(isDone ? 0.5 : 1)
+            } else {
+                GoalIcon(symbol: goal.symbol, tint: tint, size: 58)
+            }
+            CompletionButton(isDone: isDone, tint: tint, size: 28, action: onToggle)
+                .background(Circle().fill(Color(.systemBackground)))
+                .offset(x: 7, y: 7)
+        }
+        .frame(width: 66, height: 66)
+        .animation(reduceMotion ? nil : WaiMotion.quick, value: isDone)
     }
 
     private func goalSummary(streak: StreakResult, tint: Color, compact: Bool) -> some View {

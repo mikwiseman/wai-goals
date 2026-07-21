@@ -79,95 +79,126 @@ struct EmotionPicker: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    private var columns: [GridItem] {
-        if dynamicTypeSize.isAccessibilitySize {
-            [GridItem(.flexible())]
-        } else {
-            [
-                GridItem(.flexible(), spacing: Theme.Spacing.s),
-                GridItem(.flexible(), spacing: Theme.Spacing.s)
-            ]
-        }
-    }
-
     var body: some View {
-        LazyVGrid(columns: columns, spacing: Theme.Spacing.s) {
-            ForEach(GoalEmotion.allCases) { emotion in
-                let selected = selection == emotion
-                Button {
-                    selection = emotion
-                } label: {
-                    HStack(spacing: Theme.Spacing.s) {
-                        EmotionArtwork(emotion: emotion, size: 54)
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text(emotion.displayName)
-                                .font(.subheadline.weight(.semibold))
-                                .foregroundStyle(.primary)
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.72)
-                            Text(emotion.feeling)
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
-                                .lineLimit(2)
-                        }
-                        Spacer(minLength: 0)
+        Group {
+            if dynamicTypeSize.isAccessibilitySize {
+                VStack(spacing: Theme.Spacing.s) {
+                    ForEach(GoalEmotion.allCases) { emotion in
+                        compactChoice(emotion)
                     }
-                    .padding(Theme.Spacing.xs)
-                    .frame(maxWidth: .infinity, minHeight: 72, alignment: .leading)
-                    .background {
-                        RoundedRectangle(cornerRadius: Theme.Radius.small, style: .continuous)
-                            .fill(selected ? tint.opacity(0.13) : Color(.tertiarySystemFill))
-                    }
-                    .overlay {
-                        RoundedRectangle(cornerRadius: Theme.Radius.small, style: .continuous)
-                            .strokeBorder(selected ? tint.opacity(0.78) : .clear, lineWidth: 1.5)
-                    }
-                    .scaleEffect(selected ? 1.018 : 1)
-                    .contentShape(RoundedRectangle(cornerRadius: Theme.Radius.small, style: .continuous))
                 }
-                .buttonStyle(.plain)
-                .accessibilityLabel("\(emotion.displayName), \(emotion.feeling)")
-                .accessibilityAddTraits(selected ? .isSelected : [])
+            } else {
+                ScrollView(.horizontal) {
+                    LazyHStack(spacing: Theme.Spacing.m) {
+                        ForEach(GoalEmotion.allCases) { emotion in
+                            worldChoice(emotion)
+                                .escherScrollDepth(axis: .horizontal)
+                        }
+                    }
+                    .scrollTargetLayout()
+                    .padding(.vertical, Theme.Spacing.xs)
+                    .padding(.horizontal, 2)
+                }
+                .contentMargins(.horizontal, 2, for: .scrollContent)
+                .scrollTargetBehavior(.viewAligned)
+                .scrollIndicators(.hidden)
+                .frame(height: 278)
             }
         }
         .animation(reduceMotion ? nil : .spring(response: 0.32, dampingFraction: 0.78),
                    value: selection)
         .sensoryFeedback(.selection, trigger: selection)
     }
-}
 
-// MARK: - Completion reward
+    private func worldChoice(_ emotion: GoalEmotion) -> some View {
+        let selected = selection == emotion
+        return Button {
+            selection = emotion
+        } label: {
+            VStack(alignment: .leading, spacing: Theme.Spacing.s) {
+                Image(decorative: emotion.assetName)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 184, height: 184)
+                    .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.card, style: .continuous))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: Theme.Radius.card, style: .continuous)
+                            .strokeBorder(selected ? .white : .white.opacity(0.24),
+                                          lineWidth: selected ? 2 : 0.75)
+                    }
+                    .shadow(color: emotion.worldTint.opacity(selected ? 0.48 : 0.18),
+                            radius: selected ? 18 : 8, y: 8)
 
-struct EmotionCompletionOverlay: View {
-    let emotion: GoalEmotion
-
-    var body: some View {
-        ZStack {
-            Color.black.opacity(0.14)
-                .ignoresSafeArea()
-
-            VStack(spacing: Theme.Spacing.m) {
-                EmotionArtwork(emotion: emotion, size: 118, animated: true)
-                VStack(spacing: 5) {
-                    Text(emotion.displayName)
-                        .font(.title3.weight(.bold))
-                    Text(emotion.completionMessage)
-                        .font(.subheadline)
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack {
+                        Text(emotion.displayName)
+                            .font(.subheadline.weight(.bold))
+                        Spacer()
+                        if selected {
+                            selectionCheck(tint: emotion.worldTint)
+                        }
+                    }
+                    Text(emotion.feeling)
+                        .font(.caption)
                         .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
+                        .lineLimit(1)
                 }
             }
-            .padding(Theme.Spacing.xl)
-            .frame(maxWidth: 280)
-            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: Theme.Radius.hero, style: .continuous))
+            .padding(Theme.Spacing.s)
+            .frame(width: 208, alignment: .leading)
+            .background(.thinMaterial, in: RoundedRectangle(cornerRadius: Theme.Radius.card, style: .continuous))
             .overlay {
-                RoundedRectangle(cornerRadius: Theme.Radius.hero, style: .continuous)
-                    .strokeBorder(.white.opacity(0.52), lineWidth: 0.75)
+                RoundedRectangle(cornerRadius: Theme.Radius.card, style: .continuous)
+                    .strokeBorder(selected ? tint.opacity(0.82) : .white.opacity(0.24),
+                                  lineWidth: selected ? 1.5 : 0.75)
             }
+            .scaleEffect(selected ? 1 : 0.965)
         }
-        .allowsHitTesting(false)
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(emotion.displayName). \(emotion.completionMessage)")
+        .buttonStyle(.plain)
+        .accessibilityLabel("\(emotion.displayName), \(emotion.feeling)")
+        .accessibilityAddTraits(selected ? .isSelected : [])
+    }
+
+    @ViewBuilder
+    private func selectionCheck(tint: Color) -> some View {
+        if reduceMotion {
+            Image(systemName: "checkmark.circle.fill")
+                .foregroundStyle(tint)
+        } else {
+            Image(systemName: "checkmark.circle.fill")
+                .foregroundStyle(tint)
+                .symbolEffect(.bounce)
+        }
+    }
+
+    private func compactChoice(_ emotion: GoalEmotion) -> some View {
+        let selected = selection == emotion
+        return Button {
+            selection = emotion
+        } label: {
+            HStack(spacing: Theme.Spacing.m) {
+                EmotionArtwork(emotion: emotion, size: 64)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(emotion.displayName)
+                        .font(.headline)
+                        .foregroundStyle(.primary)
+                    Text(emotion.feeling)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 0)
+                if selected {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundStyle(emotion.worldTint)
+                }
+            }
+            .padding(Theme.Spacing.s)
+            .background(selected ? tint.opacity(0.13) : Color(.tertiarySystemFill),
+                        in: RoundedRectangle(cornerRadius: Theme.Radius.card, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("\(emotion.displayName), \(emotion.feeling)")
+        .accessibilityAddTraits(selected ? .isSelected : [])
     }
 }
 
