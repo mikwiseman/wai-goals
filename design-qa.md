@@ -1,68 +1,48 @@
-**Comparison Target**
+# Today design QA — 2026-07-22
 
-- Source visual truth: `731a7df:Screenshots/today.png` and `731a7df:Screenshots/today-dark.png`, plus the existing `GoalJourney` impossible-stair language.
-- Implementation screenshots: `Screenshots/today.png`, `Screenshots/today-dark.png`, `Screenshots/goals.png`, `Screenshots/stats.png`, `Screenshots/detail.png`, and `Screenshots/editor.png`.
-- Motion evidence: `Screenshots/completion-emotion.mp4` and `Screenshots/completion-emotion.png`.
-- Same-view comparison inputs: `Screenshots/qa-today-light-comparison.png` and `Screenshots/qa-today-dark-comparison.png`.
-- Viewport: iOS 26.2 simulator, 368 x 800 points.
-- State: seeded sample data; Today, Goals, Statistics, goal detail, new-goal editor, completion reward, light and dark appearance.
+**Target**
 
-**Full-view Comparison Evidence**
+- Surface: Today on iOS 26.2, 393 x 852 points, seeded sample data.
+- Goal: make the first screen an airy, immediately actionable list without repeated representations or progress summaries.
+- Comparison artifact: `/Users/mikwiseman/.gstack/projects/wai-goals/minimalism-audit-2026-07-22/09-before-after-light.png`.
 
-- The prior approved Today screen and the new implementation were placed side by side at the same viewport in both appearances.
-- The impossible stair remains the primary goal metaphor. Eight generated emotional journeys extend its cobalt, indigo, violet, and warm-light language without introducing a second visual system.
-- Today retains the airy hierarchy and grouped list. Emotion moved into compact supporting copy so three goals remain visible above the tab bar.
-- Goals, Statistics, detail, and editor were inspected as complete rendered views and after scrolling where required.
+**Hierarchy and density**
 
-**Focused Region Comparison Evidence**
+- Removed the full-width emotional hero, artwork carousel, date label, progress bar, progress summary, repeated section heading, and enclosing card.
+- Each goal now appears once: one 44-point completion control, one title, one concise metadata line, and one detail disclosure.
+- Six goals fit in the seeded first viewport. Pending goals remain first; completed goals move below them.
+- Settings and Add remain the only persistent top-level controls.
+- Intention approval remains available as a native leading swipe action instead of another visible button.
 
-- Emotional direction: Focus, Calm, Courage, Energy, Joy, Connection, Growth, and Balance each have distinct generated artwork, feeling copy, and completion copy.
-- Today: featured-emotion hero, animated progress, compact emotion metadata, intention state, and completion reward were checked.
-- Goals and detail: artwork identity, schedule metadata, progress, history, statistics, and edit controls were checked.
-- Statistics: animated progress ring, weekly trend, emotional momentum, and leaderboard were checked.
-- Editor: the emotional choice is required for new or edited goals; all eight choices, goal fields, schedule, and reminder controls were checked through the full scroll range.
-- Accessibility: semantic snapshots were inspected for labels and duplicate content. Generated artwork is decorative internally and exposed through one meaningful container label.
-- Dynamic Type: Today, Goals, Statistics, and Editor were exercised at `accessibility-extra-extra-extra-large`; adaptive vertical layouts prevent title, metadata, picker, and progress-ring collisions.
-- Reduce Motion: with `ReduceMotionEnabled = 1`, the runtime reached the settled UI predicate. With the setting off, the ambient hero intentionally remains in motion.
+**Motion and emotion**
 
-**Required Fidelity Surfaces**
+- Ordinary completion stays inline: spring check, native success feedback, brief tinted row highlight, and animated reorder.
+- Full-screen Escher artwork is reserved for rare streak milestones and achievements, where the emotional reward is meaningful.
+- All custom motion is gated by Reduce Motion.
 
-- Typography: native San Francisco hierarchy, wrapping, and numeric transitions remain readable at standard and maximum accessibility sizes.
-- Spacing: existing 20-point page margins and large section gaps are preserved; generated artwork is used as identity rather than extra decorative chrome.
-- Materials and color: semantic Liquid Glass surfaces work in both appearances. New artwork keeps a dark surround and luminous cobalt geometry so it remains legible on the phone.
-- Assets: all eight 512 x 512 raster assets are generated images with valid asset-catalog metadata and a verified runtime load test.
-- Motion: ambient float, staggered entrance, spring selection, completion reward, chart/progress reveals, and symbol feedback are purposeful and gated by Reduce Motion.
-- Product logic: legacy goals remain explicitly unassigned instead of receiving a silent default. Fresh goals require an emotional direction.
+**Accessibility**
 
-**Findings**
+- Completion controls retain a minimum 44 x 44 point hit target and goal-specific labels.
+- Goal detail rows have separate navigation labels and hints.
+- Titles and metadata can expand at accessibility Dynamic Type sizes.
+- Semantic colors and native list separators were checked in light and dark appearance.
 
-- No actionable P0, P1, or P2 findings remain.
+**Rendered evidence**
 
-**Comparison History**
-
-1. [P2] Emotion pills initially made Today denser than the approved airy baseline.
-   Fix: reduced emotion to one compact subtitle line and rechecked the side-by-side light and dark comparisons.
-2. [P2] `Connection` and goal metadata wrapped awkwardly in narrow rows.
-   Fix: constrained the picker label and composed schedule plus emotion as one responsive metadata line.
-3. [P1] At the largest accessibility size, the Today hero collapsed into a one-word column and goal titles truncated.
-   Fix: added accessibility-size vertical compositions for hero and rows; rechecked the complete screen and scroll states.
-4. [P2] The Statistics percentage overflowed its circular progress ring at the largest accessibility size.
-   Fix: stacked the ring and copy, constrained the percentage to the ring, and rechecked the rendered view.
-5. [P2] The original dark icon was too dim at Home Screen size.
-   Retained fix: all new emotional artwork uses luminous top planes, distinct edges, and local background separation.
+- Before, light: `/Users/mikwiseman/.gstack/projects/wai-goals/minimalism-audit-2026-07-22/03-today-seeded-before-light.png`
+- After, light: `/Users/mikwiseman/.gstack/projects/wai-goals/minimalism-audit-2026-07-22/05-today-after-light.png`
+- After, dark: `/Users/mikwiseman/.gstack/projects/wai-goals/minimalism-audit-2026-07-22/06-today-after-dark.png`
+- Maximum Dynamic Type: `/Users/mikwiseman/.gstack/projects/wai-goals/minimalism-audit-2026-07-22/10-today-max-dynamic-type.png`
+- Completion motion: `/Users/mikwiseman/.gstack/projects/wai-goals/minimalism-audit-2026-07-22/07-completion-motion.mp4`
+- Motion contact sheet: `/Users/mikwiseman/.gstack/projects/wai-goals/minimalism-audit-2026-07-22/08-completion-motion-contact-sheet.png`
 
 **Verification**
 
-- `xcodegen generate`: passed.
-- `git diff --check`: passed.
-- All generated `Contents.json` files: passed `jq empty`.
-- Xcode test suite (Designed for iPhone/iPad destination): 54 passed, 0 failed, 0 skipped.
-- Final simulator build and launch: passed.
-- Final build and runtime logs: no fatal, assertion, crash, uncaught, error, or failed matches.
-- Light, dark, maximum Dynamic Type, and Reduce Motion states: exercised on the running simulator.
+- Xcode test suite: 54 passed, 0 failed.
+- Debug simulator build and launch: passed.
+- Light and dark rendered states: passed.
+- Ordinary completion: stayed inline and reordered the row.
+- Three-week milestone: opened the immersive celebration and returned to the list.
+- Remaining gap: physical-device haptic feel was not evaluated in this pass.
 
-**Residual P3**
-
-- Physical-device haptic feel was not evaluated; haptics use native sensory feedback and are non-blocking for this simulator handoff.
-
-final result: passed
+Final result: passed.

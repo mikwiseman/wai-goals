@@ -7,9 +7,9 @@ struct TodayGoalRow: View {
     let goal: Goal
     let isDone: Bool
     let hasIntention: Bool
+    let isCelebrating: Bool
     var calendar: Calendar = .current
     let onToggle: () -> Void
-    let onIntend: () -> Void
     let onOpen: () -> Void
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -17,114 +17,60 @@ struct TodayGoalRow: View {
     var body: some View {
         let tint = goal.accent.color
         let streak = goal.streak(asOf: .now, calendar: calendar)
-        Group {
-            if dynamicTypeSize.isAccessibilitySize {
-                VStack(alignment: .leading, spacing: Theme.Spacing.m) {
-                    completionButton(tint: tint)
-                    goalSummary(streak: streak, tint: tint, compact: false)
-                    if streak.current > 0 {
-                        StreakBadge(count: streak.current, unit: streak.unit,
-                                    tint: tint, showsLabel: true)
-                    }
-                    supportingAction(tint: tint)
-                }
-            } else {
-                HStack(alignment: .top, spacing: Theme.Spacing.m) {
-                    completionButton(tint: tint)
-                    VStack(alignment: .leading, spacing: Theme.Spacing.s) {
-                        goalSummary(streak: streak, tint: tint, compact: true)
-                        supportingAction(tint: tint)
-                    }
-                }
-            }
+        HStack(
+            alignment: dynamicTypeSize.isAccessibilitySize ? .top : .center,
+            spacing: Theme.Spacing.s
+        ) {
+            CompletionButton(
+                isDone: isDone,
+                symbol: goal.symbol,
+                tint: tint,
+                size: 34,
+                action: onToggle
+            )
+            .accessibilityLabel(isDone ? "Mark \(goal.title) incomplete" : "Mark \(goal.title) complete")
+
+            goalSummary(streak: streak)
         }
-        .padding(.vertical, Theme.Spacing.s)
+        .padding(.vertical, Theme.Spacing.xs)
+        .padding(.horizontal, Theme.Spacing.xxs)
+        .background {
+            RoundedRectangle(cornerRadius: Theme.Radius.small, style: .continuous)
+                .fill(tint.opacity(isCelebrating ? 0.13 : 0))
+        }
+        .scaleEffect(reduceMotion || !isCelebrating ? 1 : 1.012)
+        .animation(reduceMotion ? nil : WaiMotion.quick, value: isCelebrating)
     }
 
-    private func completionButton(tint: Color) -> some View {
-        ZStack(alignment: .bottomTrailing) {
-            if let emotion = goal.emotion {
-                EmotionArtwork(emotion: emotion, size: 58, decorative: true)
-                    .opacity(isDone ? 0.58 : 1)
-                    .saturation(isDone ? 0.5 : 1)
-            } else {
-                GoalIcon(symbol: goal.symbol, tint: tint, size: 58)
-            }
-            CompletionButton(isDone: isDone, tint: tint, size: 28, action: onToggle)
-                .background(Circle().fill(Color(.systemBackground)))
-                .offset(x: 7, y: 7)
-        }
-        .frame(width: 66, height: 66)
-        .animation(reduceMotion ? nil : WaiMotion.quick, value: isDone)
-    }
-
-    private func goalSummary(streak: StreakResult, tint: Color, compact: Bool) -> some View {
+    private func goalSummary(streak: StreakResult) -> some View {
         Button(action: onOpen) {
-            HStack(spacing: Theme.Spacing.m) {
+            HStack(
+                alignment: dynamicTypeSize.isAccessibilitySize ? .top : .center,
+                spacing: Theme.Spacing.m
+            ) {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(goal.title)
                         .font(.body.weight(.semibold))
                         .strikethrough(isDone, color: .secondary)
                         .foregroundStyle(isDone ? .secondary : .primary)
-                        .lineLimit(compact ? 1 : nil)
-                        .minimumScaleFactor(compact ? 0.85 : 1)
-                        .fixedSize(horizontal: false, vertical: !compact)
-                    Text(subtitleWithEmotion)
+                        .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
+                        .fixedSize(horizontal: false, vertical: dynamicTypeSize.isAccessibilitySize)
+                    Text(metadata(streak: streak))
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                        .lineLimit(compact ? 1 : nil)
-                        .fixedSize(horizontal: false, vertical: !compact)
+                        .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 1)
+                        .fixedSize(horizontal: false, vertical: dynamicTypeSize.isAccessibilitySize)
                 }
                 Spacer(minLength: Theme.Spacing.s)
-                if compact, streak.current > 0 {
-                    StreakBadge(count: streak.current, unit: streak.unit, tint: tint)
-                }
-                if compact {
-                    Image(systemName: "chevron.right")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.tertiary)
-                }
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.tertiary)
             }
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .accessibilityLabel(accessibilityLabel(streak: streak))
         .accessibilityHint("Opens details")
-    }
-
-    @ViewBuilder
-    private func supportingAction(tint: Color) -> some View {
-        if isDone, hasIntention {
-            Label("Intention approved", systemImage: "checkmark.seal.fill")
-                .font(.caption.weight(.medium))
-                .foregroundStyle(.secondary)
-                .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 1)
-                .fixedSize(horizontal: false, vertical: dynamicTypeSize.isAccessibilitySize)
-        } else if !isDone {
-            Button(action: onIntend) {
-                Label(intentionTitle, systemImage: hasIntention ? "checkmark.seal.fill" : "target")
-                    .font(.caption.weight(.semibold))
-                    .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 1)
-                    .minimumScaleFactor(dynamicTypeSize.isAccessibilitySize ? 1 : 0.8)
-                    .fixedSize(horizontal: false, vertical: dynamicTypeSize.isAccessibilitySize)
-                    .padding(.horizontal, Theme.Spacing.xxs)
-            }
-            .waiGlassButton()
-            .controlSize(dynamicTypeSize.isAccessibilitySize ? .regular : .small)
-            .tint(hasIntention ? tint : .secondary)
-            .foregroundStyle(tint)
-            .accessibilityLabel(intentionAccessibilityLabel)
-            .frame(maxWidth: dynamicTypeSize.isAccessibilitySize ? .infinity : nil,
-                   alignment: .leading)
-        }
-    }
-
-    private var intentionTitle: String {
-        hasIntention ? "Intention approved" : "Approve intention"
-    }
-
-    private var intentionAccessibilityLabel: String {
-        hasIntention ? "Review intention for \(goal.title)" : "Approve intention for \(goal.title)"
     }
 
     private func accessibilityLabel(streak: StreakResult) -> String {
@@ -153,8 +99,14 @@ struct TodayGoalRow: View {
         return goal.schedule.summary(calendar: calendar)
     }
 
-    private var subtitleWithEmotion: String {
-        guard let emotion = goal.emotion else { return subtitle }
-        return "\(subtitle) · \(emotion.displayName)"
+    private func metadata(streak: StreakResult) -> String {
+        var parts = [subtitle]
+        if streak.current > 0 {
+            parts.append("\(streak.current) \(streak.unit.label(for: streak.current))")
+        }
+        if hasIntention, !isDone {
+            parts.append("Intention set")
+        }
+        return parts.joined(separator: " · ")
     }
 }

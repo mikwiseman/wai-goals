@@ -4,14 +4,13 @@ import SwiftData
 struct TodayView: View {
     @Environment(\.modelContext) private var context
     @Environment(NotificationCoordinator.self) private var coordinator
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Query(sort: \Goal.sortIndex) private var allGoals: [Goal]
 
     @State private var showingEditor = false
     @State private var showingSettings = false
     @State private var completionMoment: CompletionJourneyMoment?
-    @State private var selectedGoalID: UUID?
+    @State private var recentlyCompletedGoalID: UUID?
     @State private var deepLinkedGoal: Goal?
     @State private var intentionGoal: Goal?
     @State private var didHandleLaunch = false
@@ -37,10 +36,6 @@ struct TodayView: View {
         dueGoals.filter { $0.isCompleted(on: today, calendar: calendar) }.count
     }
 
-    private var pendingGoals: [Goal] {
-        dueGoals.filter { !$0.isCompleted(on: today, calendar: calendar) }
-    }
-
     var body: some View {
         NavigationStack {
             ZStack {
@@ -48,8 +43,7 @@ struct TodayView: View {
 
                 if allGoals.filter({ !$0.isArchived }).isEmpty {
                     EmptyStateView(
-                        symbol: "sparkles",
-                        emotion: .growth,
+                        symbol: "target",
                         title: "Start with one goal",
                         message: "Track the habits that matter — like “Stop working at 7 PM.” One tap a day is all it takes.",
                         actionTitle: "Add a goal",
@@ -129,198 +123,61 @@ struct TodayView: View {
     }
 
     private var content: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: Theme.Spacing.xxl) {
-                Text(today.formatted(.dateTime.weekday(.wide).month(.wide).day()))
-                    .font(.subheadline.weight(.medium))
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, Theme.Spacing.xxs)
-                    .entranceMotion(order: 0)
-                hero
-                    .entranceMotion(order: 1)
-
-                VStack(alignment: .leading, spacing: Theme.Spacing.m) {
-                    SectionHeading(
-                        title: "Today’s goals",
-                        detail: sortedDue.isEmpty ? "Open day" : "\(doneCount)/\(dueGoals.count) complete"
-                    )
-                    todayGoalsSurface
-                }
-                .entranceMotion(order: 2)
-            }
-            .padding(.horizontal, Theme.pagePadding)
-            .padding(.top, Theme.Spacing.xs)
-            .padding(.bottom, Theme.Spacing.huge)
-        }
-        .scrollIndicators(.hidden)
-    }
-
-    @ViewBuilder
-    private var todayGoalsSurface: some View {
-        if sortedDue.isEmpty {
-            HStack(spacing: Theme.Spacing.m) {
-                Image(systemName: "circle.dotted")
-                    .font(.title2)
-                    .foregroundStyle(.tint)
-                VStack(alignment: .leading, spacing: Theme.Spacing.xxs) {
+        List {
+            if sortedDue.isEmpty {
+                VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
                     Text("Nothing scheduled")
                         .font(.headline)
-                    Text("The open space is part of the path too.")
+                    Text("Today is open. Your other goals are still available in Goals.")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
-            }
-            .padding(Theme.Spacing.xl)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .card()
-        } else {
-            LazyVStack(spacing: 0) {
-                ForEach(Array(sortedDue.enumerated()), id: \.element.id) { index, goal in
+                .padding(.vertical, Theme.Spacing.m)
+                .listRowBackground(Color.clear)
+            } else {
+                ForEach(sortedDue) { goal in
+                    let isDone = goal.isCompleted(on: today, calendar: calendar)
                     let hasIntention = goal.hasIntention(on: today, calendar: calendar)
                     TodayGoalRow(
                         goal: goal,
-                        isDone: goal.isCompleted(on: today, calendar: calendar),
+                        isDone: isDone,
                         hasIntention: hasIntention,
+                        isCelebrating: recentlyCompletedGoalID == goal.id,
                         calendar: calendar,
                         onToggle: { toggle(goal) },
-                        onIntend: { intentionGoal = goal },
                         onOpen: { deepLinkedGoal = goal }
                     )
-                    .padding(.horizontal, Theme.Spacing.l)
-
-                    if index < sortedDue.count - 1 {
-                        Divider()
-                            .padding(.leading, 80)
-                    }
-                }
-            }
-            .card()
-        }
-    }
-
-    private var hero: some View {
-        let total = dueGoals.count
-        let fraction = total == 0 ? 0 : Double(doneCount) / Double(total)
-        return VStack(alignment: .leading, spacing: Theme.Spacing.m) {
-            if sortedDue.isEmpty {
-                EscherWorldStage(
-                    emotion: nil,
-                    title: "An open step",
-                    eyebrow: "Today’s observatory",
-                    message: "No goal needs your attention today.",
-                    progress: 0,
-                    height: 354
-                )
-            } else {
-                TabView(selection: $selectedGoalID) {
-                    ForEach(sortedDue) { goal in
-                        let done = goal.isCompleted(on: today, calendar: calendar)
-                        EscherWorldStage(
-                            emotion: goal.emotion,
-                            title: goal.title,
-                            eyebrow: done ? "Step complete" : "Today’s next stair",
-                            message: goal.emotion?.worldPrompt ?? goal.schedule.summary(calendar: calendar),
-                            progress: fraction,
-                            isComplete: done,
-                            height: 382,
-                            actionTitle: done
-                                ? (dynamicTypeSize.isAccessibilitySize ? "Open" : "Open this world")
-                                : (dynamicTypeSize.isAccessibilitySize ? "Complete" : "Complete this step"),
-                            actionSymbol: done ? "arrow.up.right" : "checkmark",
-                            action: done ? { deepLinkedGoal = goal } : { toggle(goal) }
-                        )
-                        .padding(.horizontal, 1)
-                        .tag(Optional(goal.id))
-                    }
-                }
-                .tabViewStyle(.page(indexDisplayMode: .never))
-                .frame(height: dynamicTypeSize.isAccessibilitySize ? 820 : 382)
-                .animation(reduceMotion ? nil : WaiMotion.spatial, value: selectedGoalID)
-
-                worldRail
-
-                Group {
-                    if dynamicTypeSize.isAccessibilitySize {
-                        VStack(alignment: .leading, spacing: Theme.Spacing.xxs) {
-                            Text(doneCount == total ? "Every world moved forward" : "\(doneCount) of \(total) steps complete")
-                            Text(fraction.formatted(.percent.precision(.fractionLength(0))))
-                                .monospacedDigit()
-                                .contentTransition(.numericText())
-                        }
-                        .font(.subheadline.weight(.semibold))
-                    } else {
-                        HStack(alignment: .firstTextBaseline) {
-                            Text(doneCount == total ? "Every world moved forward" : "\(doneCount) of \(total) steps complete")
-                                .font(.subheadline.weight(.semibold))
-                            Spacer()
-                            Text(fraction.formatted(.percent.precision(.fractionLength(0))))
-                                .font(.caption.weight(.bold))
-                                .monospacedDigit()
-                                .contentTransition(.numericText())
-                        }
-                    }
-                }
-                .foregroundStyle(.secondary)
-            }
-        }
-        .onAppear(perform: selectInitialGoal)
-        .onChange(of: sortedDue.map(\.id)) { _, ids in
-            if let selectedGoalID, ids.contains(selectedGoalID) { return }
-            selectInitialGoal()
-        }
-    }
-
-    private var worldRail: some View {
-        ScrollView(.horizontal) {
-            HStack(spacing: Theme.Spacing.s) {
-                ForEach(sortedDue) { goal in
-                    let selected = selectedGoalID == goal.id
-                    let done = goal.isCompleted(on: today, calendar: calendar)
-                    Button {
-                        if reduceMotion {
-                            selectedGoalID = goal.id
-                        } else {
-                            withAnimation(WaiMotion.spatial) { selectedGoalID = goal.id }
-                        }
-                    } label: {
-                        ZStack(alignment: .bottomTrailing) {
-                            if let emotion = goal.emotion {
-                                EmotionArtwork(emotion: emotion, size: selected ? 52 : 44)
-                            } else {
-                                GoalIcon(symbol: goal.symbol, tint: goal.accent.color,
-                                         size: selected ? 52 : 44)
+                    .swipeActions(edge: .leading, allowsFullSwipe: false) {
+                        if !isDone {
+                            Button {
+                                intentionGoal = goal
+                            } label: {
+                                Label(
+                                    hasIntention ? "Review intention" : "Set intention",
+                                    systemImage: hasIntention ? "checkmark.seal.fill" : "target"
+                                )
                             }
-                            if done {
-                                Image(systemName: "checkmark.circle.fill")
-                                    .font(.caption.weight(.bold))
-                                    .foregroundStyle(.white, goal.accent.color)
-                                    .background(Circle().fill(Color(.systemBackground)))
-                                    .offset(x: 3, y: 3)
-                                    .dynamicTypeSize(.large)
-                            }
-                        }
-                        .padding(3)
-                        .overlay {
-                            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                .strokeBorder(selected ? goal.accent.color : .clear, lineWidth: 2)
+                            .tint(goal.accent.color)
                         }
                     }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel(goal.title)
-                    .accessibilityAddTraits(selected ? .isSelected : [])
+                    .listRowBackground(Color.clear)
+                    .listRowSeparatorTint(.secondary.opacity(0.14))
                 }
             }
-            .padding(.horizontal, 2)
-            .padding(.vertical, 3)
         }
-        .scrollIndicators(.hidden)
+        .listStyle(.plain)
+        .scrollContentBackground(.hidden)
+        .contentMargins(.top, Theme.Spacing.xs, for: .scrollContent)
+        .animation(reduceMotion ? nil : WaiMotion.spatial, value: sortedDue.map(\.id))
     }
 
     private func toggle(_ goal: Goal) {
         let before = AchievementSnapshot(goals: allGoals, calendar: calendar)
         let wasDone = goal.isCompleted(on: today, calendar: calendar)
         let completedBeforeToggle = doneCount
-        let newStreak = goal.toggleCompletion(on: today, context: context, calendar: calendar)
+        let newStreak = withAnimation(reduceMotion ? nil : WaiMotion.quick) {
+            goal.toggleCompletion(on: today, context: context, calendar: calendar)
+        }
         let achievements = wasDone ? [] : AchievementEngine.newlyUnlocked(
             before: before,
             after: before.addingCompletion(to: goal.id, on: today, calendar: calendar),
@@ -333,21 +190,17 @@ struct TodayView: View {
             ? max(completedBeforeToggle - 1, 0)
             : min(completedBeforeToggle + 1, dueGoals.count)
 
-        if let newStreak, Milestone.reached(newStreak) {
-            Haptics.success()
+        if !wasDone {
+            showRowFeedback(for: goal.id)
+        }
+
+        if !wasDone, let newStreak, Milestone.reached(newStreak) {
             if let emotion = goal.emotion {
                 showCompletion(goal: goal, emotion: emotion,
                                milestone: "\(newStreak) \(goal.schedule.streakUnit.label(for: newStreak)) in a row",
                                achievements: achievements,
                                completedToday: completedToday)
             }
-        } else if !wasDone, let emotion = goal.emotion {
-            showCompletion(
-                goal: goal,
-                emotion: emotion,
-                achievements: achievements,
-                completedToday: completedToday
-            )
         }
     }
 
@@ -384,7 +237,25 @@ struct TodayView: View {
         }
     }
 
-    private func selectInitialGoal() {
-        selectedGoalID = pendingGoals.first?.id ?? sortedDue.first?.id
+    private func showRowFeedback(for goalID: UUID) {
+        if reduceMotion {
+            recentlyCompletedGoalID = goalID
+        } else {
+            withAnimation(WaiMotion.quick) {
+                recentlyCompletedGoalID = goalID
+            }
+        }
+
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(650))
+            guard recentlyCompletedGoalID == goalID else { return }
+            if reduceMotion {
+                recentlyCompletedGoalID = nil
+            } else {
+                withAnimation(.easeOut(duration: 0.2)) {
+                    recentlyCompletedGoalID = nil
+                }
+            }
+        }
     }
 }

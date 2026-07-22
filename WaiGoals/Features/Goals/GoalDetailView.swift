@@ -323,18 +323,16 @@ struct GoalDetailView: View {
         )
         AchievementUnlockStore.record(achievements.map(\.id), context: context)
 
-        var completed = goal.completedDays(calendar: calendar)
-        if !wasDone { completed.insert(today) }
-        let week = StatsCalculator.currentWeekProgress(
-            schedule: goal.schedule,
-            completedDays: completed,
-            asOf: today,
-            calendar: calendar
-        )
-
-        if let newStreak, Milestone.reached(newStreak) {
-            Haptics.success()
+        if !wasDone, let newStreak, Milestone.reached(newStreak) {
             if let emotion = goal.emotion {
+                var completed = goal.completedDays(calendar: calendar)
+                completed.insert(today)
+                let week = StatsCalculator.currentWeekProgress(
+                    schedule: goal.schedule,
+                    completedDays: completed,
+                    asOf: today,
+                    calendar: calendar
+                )
                 showCompletion(
                     emotion,
                     milestone: "\(newStreak) \(goal.schedule.streakUnit.label(for: newStreak)) in a row",
@@ -342,8 +340,6 @@ struct GoalDetailView: View {
                     week: week
                 )
             }
-        } else if !wasDone, let emotion = goal.emotion {
-            showCompletion(emotion, achievements: achievements, week: week)
         }
     }
 
