@@ -16,12 +16,12 @@ struct IntentionApprovalSheet: View {
 
     var body: some View {
         NavigationStack {
-            VStack(alignment: .leading, spacing: Theme.Spacing.l) {
+            VStack(alignment: .leading, spacing: Theme.Spacing.xxl) {
                 header
                 pledgeCard
                 approveButton
             }
-            .padding(Theme.Spacing.l)
+            .padding(Theme.Spacing.xl)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .background(AppBackground(tint: goal.accent.color))
             .navigationTitle("Intention")
@@ -52,14 +52,14 @@ struct IntentionApprovalSheet: View {
 
     private var pledgeCard: some View {
         VStack(alignment: .leading, spacing: Theme.Spacing.s) {
-            Text("Today")
+            Text("Today’s deliberate step")
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(.secondary)
             Text(Intention.pledgeText)
                 .font(.title3.weight(.semibold))
                 .fixedSize(horizontal: false, vertical: true)
         }
-        .padding(Theme.Spacing.l)
+        .padding(Theme.Spacing.xl)
         .frame(maxWidth: .infinity, alignment: .leading)
         .card(cornerRadius: Theme.Radius.button)
     }
@@ -74,7 +74,7 @@ struct IntentionApprovalSheet: View {
                 .font(.headline)
                 .frame(maxWidth: .infinity)
         }
-        .buttonStyle(.borderedProminent)
+        .waiGlassButton(prominent: true)
         .tint(goal.accent.color)
         .controlSize(.large)
     }

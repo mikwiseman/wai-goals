@@ -28,20 +28,77 @@ enum Milestone {
 
 // MARK: - Goal icon
 
+struct GoalJourneyArtwork: View {
+    var size: CGFloat = 88
+
+    var body: some View {
+        Image("GoalJourney")
+            .resizable()
+            .scaledToFit()
+            .frame(width: size, height: size)
+            .clipShape(RoundedRectangle(cornerRadius: size * 0.25, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: size * 0.25, style: .continuous)
+                    .strokeBorder(.white.opacity(0.78), lineWidth: 0.75)
+            }
+            .accessibilityHidden(true)
+    }
+}
+
 struct GoalIcon: View {
     let symbol: String
     let tint: Color
     var size: CGFloat = 40
 
     var body: some View {
-        RoundedRectangle(cornerRadius: size * 0.28, style: .continuous)
-            .fill(tint.opacity(0.16))
-            .frame(width: size, height: size)
-            .overlay(
-                Image(systemName: symbol)
-                    .font(.system(size: size * 0.46, weight: .semibold))
-                    .foregroundStyle(tint)
-            )
+        ZStack {
+            RoundedRectangle(cornerRadius: size * 0.28, style: .continuous)
+                .fill(.thinMaterial)
+            RoundedRectangle(cornerRadius: size * 0.28, style: .continuous)
+                .fill(tint.opacity(0.11))
+            Image(systemName: symbol)
+                .font(.system(size: size * 0.46, weight: .semibold))
+                .foregroundStyle(tint)
+        }
+        .frame(width: size, height: size)
+        .overlay {
+            RoundedRectangle(cornerRadius: size * 0.28, style: .continuous)
+                .strokeBorder(.white.opacity(0.55), lineWidth: 0.75)
+        }
+    }
+}
+
+struct SectionHeading: View {
+    let title: String
+    var detail: String? = nil
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
+    var body: some View {
+        Group {
+            if dynamicTypeSize.isAccessibilitySize {
+                VStack(alignment: .leading, spacing: Theme.Spacing.xxs) {
+                    Text(title)
+                        .font(.headline)
+                    if let detail {
+                        Text(detail)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            } else {
+                HStack(alignment: .firstTextBaseline) {
+                    Text(title)
+                        .font(.headline)
+                    Spacer(minLength: Theme.Spacing.m)
+                    if let detail {
+                        Text(detail)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+        }
+        .padding(.horizontal, Theme.Spacing.xxs)
     }
 }
 
@@ -81,12 +138,14 @@ struct StreakBadge: View {
             Text("\(count)")
                 .font(.callout.weight(.bold))
                 .monospacedDigit()
+                .contentTransition(.numericText())
             if showsLabel {
                 Text(unit.label(for: count))
                     .font(.caption)
             }
         }
         .foregroundStyle(count > 0 ? AnyShapeStyle(tint) : AnyShapeStyle(Color.secondary))
+        .accessibilityElement(children: .ignore)
         .accessibilityLabel(count > 0 ? "\(count) \(unit.label(for: count)) streak" : "No streak yet")
     }
 }
@@ -156,6 +215,7 @@ struct DayDot: View {
                     Image(systemName: "checkmark")
                         .font(.system(size: size * 0.42, weight: .bold))
                         .foregroundStyle(.white)
+                        .symbolEffect(.bounce, value: state == .completed)
                 }
             }
             .overlay(
@@ -205,108 +265,11 @@ struct WeekStrip: View {
     }
 }
 
-// MARK: - Confetti & milestone celebration
-
-private struct ConfettiPiece: Identifiable {
-    let id = UUID()
-    let color: Color
-    let angle: Double
-    let distance: CGFloat
-    let size: CGFloat
-    let spin: Double
-    let delay: Double
-}
-
-struct ConfettiView: View {
-    @State private var animate = false
-    private let pieces: [ConfettiPiece]
-
-    init(palette: [Color] = AccentToken.allCases.map(\.color), count: Int = 64) {
-        self.pieces = (0..<count).map { i in
-            ConfettiPiece(
-                color: palette[i % palette.count],
-                angle: Double.random(in: 0..<(2 * .pi)),
-                distance: CGFloat.random(in: 90...240),
-                size: CGFloat.random(in: 6...11),
-                spin: Double.random(in: -360...360),
-                delay: Double.random(in: 0...0.12)
-            )
-        }
-    }
-
-    var body: some View {
-        GeometryReader { geo in
-            ZStack {
-                ForEach(pieces) { piece in
-                    RoundedRectangle(cornerRadius: 2, style: .continuous)
-                        .fill(piece.color)
-                        .frame(width: piece.size, height: piece.size * 0.6)
-                        .rotationEffect(.degrees(animate ? piece.spin : 0))
-                        .offset(
-                            x: animate ? cos(piece.angle) * piece.distance : 0,
-                            y: animate ? sin(piece.angle) * piece.distance + 130 : 0
-                        )
-                        .opacity(animate ? 0 : 1)
-                        .animation(.easeOut(duration: 1.5).delay(piece.delay), value: animate)
-                }
-                .position(x: geo.size.width / 2, y: geo.size.height * 0.42)
-            }
-        }
-        .allowsHitTesting(false)
-        .onAppear { animate = true }
-    }
-}
-
-struct MilestoneOverlay: View {
-    let streak: Int
-    let unit: StreakUnit
-    var tint: Color = .accentColor
-    let onDismiss: () -> Void
-
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    var body: some View {
-        ZStack {
-            Rectangle()
-                .fill(.black.opacity(0.45))
-                .ignoresSafeArea()
-                .onTapGesture(perform: onDismiss)
-
-            if !reduceMotion { ConfettiView() }
-
-            VStack(spacing: Theme.Spacing.l) {
-                ZStack {
-                    Circle().fill(tint.gradient).frame(width: 108, height: 108)
-                    Image(systemName: "flame.fill")
-                        .font(.system(size: 48, weight: .bold))
-                        .foregroundStyle(.white)
-                }
-                VStack(spacing: 6) {
-                    Text("\(streak) \(unit.label(for: streak)) in a row!")
-                        .font(.title2.weight(.bold))
-                        .multilineTextAlignment(.center)
-                    Text(Milestone.message(for: streak, unit: unit))
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
-                }
-                Button("Keep going", action: onDismiss)
-                    .buttonStyle(.borderedProminent)
-                    .tint(tint)
-                    .controlSize(.large)
-            }
-            .padding(Theme.Spacing.xxl)
-            .frame(maxWidth: 320)
-            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: Theme.Radius.hero, style: .continuous))
-            .padding(Theme.Spacing.xxxl)
-        }
-    }
-}
-
 // MARK: - Empty state
 
 struct EmptyStateView: View {
     let symbol: String
+    var emotion: GoalEmotion? = nil
     let title: String
     let message: String
     var actionTitle: String? = nil
@@ -315,10 +278,14 @@ struct EmptyStateView: View {
 
     var body: some View {
         VStack(spacing: Theme.Spacing.l) {
-            Image(systemName: symbol)
-                .font(.system(size: 52, weight: .regular))
-                .foregroundStyle(tint.gradient)
-                .symbolRenderingMode(.hierarchical)
+            if let emotion {
+                EmotionArtwork(emotion: emotion, size: 104, animated: true, decorative: false)
+            } else {
+                Image(systemName: symbol)
+                    .font(.system(size: 52, weight: .regular))
+                    .foregroundStyle(tint.gradient)
+                    .symbolRenderingMode(.hierarchical)
+            }
             VStack(spacing: Theme.Spacing.s) {
                 Text(title)
                     .font(.title3.weight(.semibold))
@@ -330,7 +297,7 @@ struct EmptyStateView: View {
             }
             if let actionTitle, let action {
                 Button(actionTitle, action: action)
-                    .buttonStyle(.borderedProminent)
+                    .waiGlassButton(prominent: true)
                     .tint(tint)
                     .controlSize(.large)
                     .padding(.top, Theme.Spacing.xs)
@@ -340,4 +307,3 @@ struct EmptyStateView: View {
         .frame(maxWidth: 360)
     }
 }
-

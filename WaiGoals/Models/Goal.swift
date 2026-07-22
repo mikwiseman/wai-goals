@@ -12,6 +12,9 @@ final class Goal {
     var symbol: String = "target"
     /// `AccentToken.rawValue`.
     var colorToken: String = AccentToken.default.rawValue
+    /// `GoalEmotion.rawValue`. Optional so existing goals are never assigned an
+    /// invented emotional direction during schema migration.
+    var emotionRawValue: String?
 
     /// `ScheduleType.rawValue`.
     var scheduleTypeRaw: Int = ScheduleType.daily.rawValue
@@ -39,6 +42,7 @@ final class Goal {
         title: String,
         symbol: String = "target",
         color: AccentToken = .default,
+        emotion: GoalEmotion? = nil,
         schedule: Schedule = .daily,
         reminderEnabled: Bool = false,
         reminderTime: Date? = nil,
@@ -50,6 +54,7 @@ final class Goal {
         self.title = title
         self.symbol = symbol
         self.colorToken = color.rawValue
+        self.emotionRawValue = emotion?.rawValue
         self.scheduleTypeRaw = schedule.type.rawValue
         self.scheduledWeekdaysRaw = schedule.weekdays.map(\.rawValue).sorted()
         self.weeklyTarget = schedule.timesPerWeek
@@ -82,6 +87,11 @@ extension Goal {
     }
 
     var accent: AccentToken { AccentToken(rawValue: colorToken) ?? .default }
+
+    var emotion: GoalEmotion? {
+        get { emotionRawValue.flatMap(GoalEmotion.init(rawValue:)) }
+        set { emotionRawValue = newValue?.rawValue }
+    }
 }
 
 // MARK: - Completion helpers

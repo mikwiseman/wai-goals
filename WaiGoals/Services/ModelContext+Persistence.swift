@@ -28,4 +28,14 @@ extension ModelContext {
             return []
         }
     }
+
+    func allAchievementUnlocks(_ function: StaticString = #function) -> [AchievementUnlock] {
+        do {
+            return try fetch(FetchDescriptor<AchievementUnlock>())
+        } catch {
+            persistenceLog.error("Achievement fetch failed in \(String(describing: function), privacy: .public): \(error, privacy: .public)")
+            assertionFailure("Achievement fetch failed: \(error)")
+            return []
+        }
+    }
 }

@@ -37,16 +37,20 @@ struct SymbolPicker: View {
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                LazyVGrid(columns: columns, spacing: 12) {
-                    ForEach(filtered, id: \.self) { name in
-                        SymbolCell(name: name, isSelected: selection == name, tint: tint) {
-                            selection = name
-                            dismiss()
+            ZStack {
+                AppBackground(tint: tint)
+                ScrollView {
+                    LazyVGrid(columns: columns, spacing: Theme.Spacing.s) {
+                        ForEach(filtered, id: \.self) { name in
+                            SymbolCell(name: name, isSelected: selection == name, tint: tint) {
+                                selection = name
+                                dismiss()
+                            }
                         }
                     }
+                    .padding(Theme.Spacing.l)
                 }
-                .padding()
+                .scrollIndicators(.hidden)
             }
             .navigationTitle("Choose an Icon")
             .navigationBarTitleDisplayMode(.inline)
@@ -77,6 +81,10 @@ private struct SymbolCell: View {
 
     private var background: some View {
         RoundedRectangle(cornerRadius: 14, style: .continuous)
-            .fill(isSelected ? tint.opacity(0.2) : Color(.secondarySystemBackground))
+            .fill(isSelected ? AnyShapeStyle(tint.opacity(0.18)) : AnyShapeStyle(.thinMaterial))
+            .overlay {
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .strokeBorder(isSelected ? tint.opacity(0.55) : .white.opacity(0.45), lineWidth: 0.75)
+            }
     }
 }

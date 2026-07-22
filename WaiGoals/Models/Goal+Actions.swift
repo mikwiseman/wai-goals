@@ -55,11 +55,3 @@ extension Goal {
         return StreakCalculator.streak(schedule: schedule, completedDays: days, asOf: day, calendar: calendar).current
     }
 }
-
-/// Carries milestone celebration data to a presenting view.
-struct MilestoneInfo: Identifiable, Equatable {
-    let id = UUID()
-    let streak: Int
-    let unit: StreakUnit
-    let accent: AccentToken
-}
