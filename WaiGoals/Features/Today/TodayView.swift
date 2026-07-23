@@ -9,7 +9,7 @@ struct TodayView: View {
 
     @State private var showingEditor = false
     @State private var showingSettings = false
-    @State private var completionMoment: CompletionJourneyMoment?
+    @State private var milestone: MilestoneInfo?
     @State private var recentlyCompletedGoalID: UUID?
     @State private var deepLinkedGoal: Goal?
     @State private var intentionGoal: Goal?
@@ -34,6 +34,14 @@ struct TodayView: View {
 
     private var doneCount: Int {
         dueGoals.filter { $0.isCompleted(on: today, calendar: calendar) }.count
+    }
+
+    private var pendingGoals: [Goal] {
+        dueGoals.filter { !$0.isCompleted(on: today, calendar: calendar) }
+    }
+
+    private var intendedPendingCount: Int {
+        pendingGoals.filter { $0.hasIntention(on: today, calendar: calendar) }.count
     }
 
     var body: some View {
@@ -87,94 +95,147 @@ struct TodayView: View {
                 case "settings": showingSettings = true
                 case "detail": deepLinkedGoal = allGoals.first { !$0.isArchived }
                 case "milestone":
-                    completionMoment = CompletionJourneyMoment(
-                        goalTitle: allGoals.first?.title ?? "Your goal",
-                        emotion: allGoals.first?.emotion ?? .growth,
-                        progressLabel: "A new stair is visible",
-                        milestone: "30 days in a row"
-                    )
-                case "achievement":
-                    completionMoment = CompletionJourneyMoment(
-                        goalTitle: allGoals.first?.title ?? "Your goal",
-                        emotion: allGoals.first?.emotion ?? .growth,
-                        progressLabel: "A real step moved the path",
-                        achievements: [
-                            AchievementProgress(
-                                id: .atlasMaker,
-                                currentValue: 100,
-                                targetValue: 100
-                            )
-                        ]
-                    )
+                    milestone = MilestoneInfo(streak: 30, unit: .day, accent: .teal)
                 default: break
                 }
             }
         }
-        .toolbar(completionMoment == nil ? .visible : .hidden, for: .tabBar)
         .overlay {
-            if let completionMoment {
-                GoalCompletionJourney(moment: completionMoment) {
-                    dismissCompletion()
+            if let milestone {
+                MilestoneOverlay(
+                    streak: milestone.streak,
+                    unit: milestone.unit,
+                    tint: milestone.accent.color
+                ) {
+                    withAnimation { self.milestone = nil }
                 }
-                .transition(reduceMotion ? .opacity : .opacity.combined(with: .scale(scale: 1.04)))
-                .zIndex(20)
+                .transition(.opacity)
             }
         }
     }
 
     private var content: some View {
-        List {
-            if sortedDue.isEmpty {
-                VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
-                    Text("Nothing scheduled")
-                        .font(.headline)
-                    Text("Today is open. Your other goals are still available in Goals.")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
-                .padding(.vertical, Theme.Spacing.m)
-                .listRowBackground(Color.clear)
-            } else {
-                ForEach(sortedDue) { goal in
-                    let isDone = goal.isCompleted(on: today, calendar: calendar)
-                    let hasIntention = goal.hasIntention(on: today, calendar: calendar)
-                    TodayGoalRow(
-                        goal: goal,
-                        isDone: isDone,
-                        hasIntention: hasIntention,
-                        isCelebrating: recentlyCompletedGoalID == goal.id,
-                        calendar: calendar,
-                        onToggle: { toggle(goal) },
-                        onOpen: { deepLinkedGoal = goal }
-                    )
-                    .swipeActions(edge: .leading, allowsFullSwipe: false) {
-                        if !isDone {
-                            Button {
-                                intentionGoal = goal
-                            } label: {
-                                Label(
-                                    hasIntention ? "Review intention" : "Set intention",
-                                    systemImage: hasIntention ? "checkmark.seal.fill" : "target"
-                                )
-                            }
-                            .tint(goal.accent.color)
-                        }
+        ScrollView {
+            VStack(spacing: Theme.Spacing.l) {
+                Text(today.formatted(.dateTime.weekday(.wide).month(.wide).day()))
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, Theme.Spacing.xs)
+
+                intentionSummary
+
+                LazyVStack(spacing: Theme.Spacing.m) {
+                    ForEach(sortedDue) { goal in
+                        let hasIntention = goal.hasIntention(on: today, calendar: calendar)
+                        TodayGoalRow(
+                            goal: goal,
+                            isDone: goal.isCompleted(on: today, calendar: calendar),
+                            hasIntention: hasIntention,
+                            isCelebrating: recentlyCompletedGoalID == goal.id,
+                            calendar: calendar,
+                            onToggle: { toggle(goal) },
+                            onIntend: { intentionGoal = goal },
+                            onOpen: { deepLinkedGoal = goal }
+                        )
                     }
-                    .listRowBackground(Color.clear)
-                    .listRowSeparatorTint(.secondary.opacity(0.14))
                 }
             }
+            .padding(.horizontal, Theme.pagePadding)
+            .padding(.top, Theme.Spacing.xs)
+            .padding(.bottom, Theme.Spacing.huge)
         }
-        .listStyle(.plain)
-        .scrollContentBackground(.hidden)
-        .contentMargins(.top, Theme.Spacing.xs, for: .scrollContent)
+        .scrollIndicators(.hidden)
         .animation(reduceMotion ? nil : WaiMotion.spatial, value: sortedDue.map(\.id))
+    }
+
+    private var intentionSummary: some View {
+        let total = dueGoals.count
+        let fraction = total == 0 ? 0 : Double(doneCount) / Double(total)
+        let allDone = total > 0 && doneCount == total
+        let pending = pendingGoals.count
+        let intended = intendedPendingCount
+
+        return HStack(spacing: Theme.Spacing.xl) {
+            ZStack {
+                ProgressRing(fraction: fraction, lineWidth: 11)
+                    .frame(width: 92, height: 92)
+                if allDone {
+                    Image(systemName: "checkmark")
+                        .font(.system(.largeTitle, design: .rounded).weight(.bold))
+                        .foregroundStyle(.tint)
+                } else {
+                    VStack(spacing: 0) {
+                        Text("\(doneCount)")
+                            .font(.system(.title, design: .rounded).weight(.bold))
+                            .monospacedDigit()
+                            .minimumScaleFactor(0.5)
+                        Text("of \(total)")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Today's progress")
+            .accessibilityValue(
+                summaryAccessibilityValue(
+                    total: total,
+                    allDone: allDone,
+                    pending: pending,
+                    intended: intended
+                )
+            )
+
+            VStack(alignment: .leading, spacing: Theme.Spacing.xxs) {
+                Text(summaryTitle(total: total, allDone: allDone, pending: pending, intended: intended))
+                    .font(.title3.weight(.semibold))
+                Text(summaryMessage(total: total, allDone: allDone, pending: pending, intended: intended))
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(Theme.Spacing.xl)
+        .frame(maxWidth: .infinity)
+        .card(cornerRadius: Theme.Radius.hero)
+    }
+
+    private func summaryTitle(total: Int, allDone: Bool, pending: Int, intended: Int) -> String {
+        if allDone { return "All done for today" }
+        if total == 0 { return "Nothing scheduled today" }
+        if pending > 0 && intended == pending { return "Today is committed" }
+        if intended > 0 { return "Intention in motion" }
+        return "Choose today’s intention"
+    }
+
+    private func summaryMessage(total: Int, allDone: Bool, pending: Int, intended: Int) -> String {
+        if allDone { return "Every goal checked off. Nice work." }
+        if total == 0 { return "Enjoy the open space." }
+        if pending > 0 && intended == pending {
+            return "All \(pending) pending \(pending == 1 ? "goal is" : "goals are") committed."
+        }
+        if intended > 0 {
+            return "\(intended) of \(pending) pending \(pending == 1 ? "goal" : "goals") committed."
+        }
+        return "\(pending) \(pending == 1 ? "goal is" : "goals are") waiting for approval."
+    }
+
+    private func summaryAccessibilityValue(
+        total: Int,
+        allDone: Bool,
+        pending: Int,
+        intended: Int
+    ) -> String {
+        if allDone { return "All \(total) goals complete" }
+        if total == 0 { return "No goals scheduled today" }
+        return "\(doneCount) of \(total) goals complete, \(intended) of \(pending) pending goals have intentions"
     }
 
     private func toggle(_ goal: Goal) {
         let before = AchievementSnapshot(goals: allGoals, calendar: calendar)
         let wasDone = goal.isCompleted(on: today, calendar: calendar)
-        let completedBeforeToggle = doneCount
         let newStreak = withAnimation(reduceMotion ? nil : WaiMotion.quick) {
             goal.toggleCompletion(on: today, context: context, calendar: calendar)
         }
@@ -186,53 +247,19 @@ struct TodayView: View {
             calendar: calendar
         )
         AchievementUnlockStore.record(achievements.map(\.id), context: context)
-        let completedToday = wasDone
-            ? max(completedBeforeToggle - 1, 0)
-            : min(completedBeforeToggle + 1, dueGoals.count)
 
         if !wasDone {
             showRowFeedback(for: goal.id)
         }
 
         if !wasDone, let newStreak, Milestone.reached(newStreak) {
-            if let emotion = goal.emotion {
-                showCompletion(goal: goal, emotion: emotion,
-                               milestone: "\(newStreak) \(goal.schedule.streakUnit.label(for: newStreak)) in a row",
-                               achievements: achievements,
-                               completedToday: completedToday)
-            }
-        }
-    }
-
-    private func showCompletion(
-        goal: Goal,
-        emotion: GoalEmotion,
-        milestone: String? = nil,
-        achievements: [AchievementProgress] = [],
-        completedToday: Int
-    ) {
-        let moment = CompletionJourneyMoment(
-            goalTitle: goal.title,
-            emotion: emotion,
-            progressLabel: "\(completedToday) of \(dueGoals.count) steps today",
-            milestone: milestone,
-            achievements: achievements
-        )
-        if reduceMotion {
-            completionMoment = moment
-        } else {
-            withAnimation(WaiMotion.reveal) {
-                completionMoment = moment
-            }
-        }
-    }
-
-    private func dismissCompletion() {
-        if reduceMotion {
-            completionMoment = nil
-        } else {
-            withAnimation(.easeOut(duration: 0.24)) {
-                completionMoment = nil
+            Haptics.success()
+            withAnimation {
+                milestone = MilestoneInfo(
+                    streak: newStreak,
+                    unit: goal.schedule.streakUnit,
+                    accent: goal.accent
+                )
             }
         }
     }

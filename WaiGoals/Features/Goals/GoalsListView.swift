@@ -4,11 +4,9 @@ import SwiftData
 struct GoalsListView: View {
     @Environment(\.modelContext) private var context
     @Environment(NotificationScheduler.self) private var scheduler
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Query(sort: \Goal.sortIndex) private var goals: [Goal]
     @State private var showingEditor = false
     @State private var goalToDelete: Goal?
-    @Namespace private var navigationNamespace
 
     private let calendar = Calendar.current
     private var active: [Goal] { goals.filter { !$0.isArchived } }
@@ -21,7 +19,6 @@ struct GoalsListView: View {
                 if goals.isEmpty {
                     EmptyStateView(
                         symbol: "square.stack.3d.up",
-                        emotion: .courage,
                         title: "No goals yet",
                         message: "Add goals you want to keep up with — daily, on certain days, or a few times a week.",
                         actionTitle: "Add a goal",
@@ -58,21 +55,13 @@ struct GoalsListView: View {
 
     private var list: some View {
         List {
-            Section {
+            Section("Active") {
                 ForEach(active) { goal in
                     NavigationLink {
-                        goalDestination(goal)
+                        GoalDetailView(goal: goal)
                     } label: {
                         GoalListRow(goal: goal, calendar: calendar)
-                            .matchedTransitionSource(id: goal.id, in: navigationNamespace) { source in
-                                source
-                                    .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.card,
-                                                                style: .continuous))
-                                    .shadow(color: goal.accent.color.opacity(0.18), radius: 18, y: 9)
-                            }
                     }
-                    .buttonStyle(.plain)
-                    .escherScrollDepth()
                     .swipeActions(edge: .trailing) {
                         Button(role: .destructive) { goalToDelete = goal } label: {
                             Label("Delete", systemImage: "trash")
@@ -82,27 +71,15 @@ struct GoalsListView: View {
                         }
                         .tint(.gray)
                     }
-                    .listRowInsets(.init(top: Theme.Spacing.xs, leading: Theme.pagePadding,
-                                        bottom: Theme.Spacing.xs, trailing: Theme.pagePadding))
-                    .listRowBackground(Color.clear)
-                    .listRowSeparator(.hidden)
                 }
                 .onMove(perform: move)
-            } header: {
-                HStack {
-                    Text("Active goals")
-                    Spacer()
-                    Text("\(active.count)")
-                        .monospacedDigit()
-                }
             }
 
             if !archived.isEmpty {
-                Section {
+                Section("Archived") {
                     ForEach(archived) { goal in
                         GoalListRow(goal: goal, calendar: calendar)
                             .foregroundStyle(.secondary)
-                            .saturation(0.25)
                             .swipeActions(edge: .trailing) {
                                 Button(role: .destructive) { delete(goal) } label: {
                                     Label("Delete", systemImage: "trash")
@@ -112,35 +89,12 @@ struct GoalsListView: View {
                                 }
                                 .tint(.blue)
                             }
-                            .listRowInsets(.init(top: Theme.Spacing.xs, leading: Theme.pagePadding,
-                                                bottom: Theme.Spacing.xs, trailing: Theme.pagePadding))
-                            .listRowBackground(Color.clear)
-                            .listRowSeparator(.hidden)
-                    }
-                } header: {
-                    HStack {
-                        Text("Archived")
-                        Spacer()
-                        Text("\(archived.count)")
-                            .monospacedDigit()
                     }
                 }
             }
         }
-        .listStyle(.plain)
-        .listSectionSpacing(Theme.Spacing.xl)
+        .listStyle(.insetGrouped)
         .scrollContentBackground(.hidden)
-    }
-
-    @ViewBuilder
-    private func goalDestination(_ goal: Goal) -> some View {
-        if reduceMotion {
-            GoalDetailView(goal: goal)
-                .navigationTransition(.automatic)
-        } else {
-            GoalDetailView(goal: goal)
-                .navigationTransition(.zoom(sourceID: goal.id, in: navigationNamespace))
-        }
     }
 
     // MARK: - Mutations
@@ -178,80 +132,30 @@ struct GoalsListView: View {
 struct GoalListRow: View {
     let goal: Goal
     var calendar: Calendar = .current
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
         let tint = goal.accent.color
-        let streak = goal.streak(asOf: .now, calendar: calendar)
-        Group {
-            if dynamicTypeSize.isAccessibilitySize {
-                VStack(alignment: .leading, spacing: Theme.Spacing.s) {
-                    artwork(size: 78, tint: tint)
-                    Text(goal.title)
-                        .font(.headline)
-                        .fixedSize(horizontal: false, vertical: true)
-                    if let emotion = goal.emotion {
-                        Text(emotion.worldPrompt)
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                    Text(metadata)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                    if streak.current > 0 {
-                        StreakBadge(count: streak.current, unit: streak.unit,
-                                    tint: tint, showsLabel: true)
+        HStack(spacing: Theme.Spacing.m) {
+            GoalIcon(symbol: goal.symbol, tint: tint, size: 40)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(goal.title)
+                    .font(.body.weight(.semibold))
+                    .lineLimit(1)
+                HStack(spacing: 6) {
+                    Text(goal.schedule.summary(calendar: calendar))
+                    if goal.reminderEnabled, let time = goal.reminderTime {
+                        Text("· \(time.formatted(date: .omitted, time: .shortened))")
                     }
                 }
-            } else {
-                HStack(spacing: Theme.Spacing.m) {
-                    artwork(size: 82, tint: tint)
-                    VStack(alignment: .leading, spacing: 5) {
-                        if let emotion = goal.emotion {
-                            Text(emotion.displayName.uppercased())
-                                .font(.caption2.weight(.bold))
-                                .tracking(1.1)
-                                .foregroundStyle(emotion.worldTint)
-                        }
-                        Text(goal.title)
-                            .font(.headline)
-                            .lineLimit(2)
-                        Text(metadata)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.72)
-                    }
-                    Spacer(minLength: Theme.Spacing.s)
-                    if streak.current > 0 {
-                        StreakBadge(count: streak.current, unit: streak.unit, tint: tint)
-                    }
-                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            }
+            Spacer(minLength: Theme.Spacing.s)
+            let streak = goal.streak(asOf: .now, calendar: calendar)
+            if streak.current > 0 {
+                StreakBadge(count: streak.current, unit: streak.unit, tint: tint)
             }
         }
-        .padding(Theme.Spacing.m)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .card()
-        .accessibilityElement(children: .combine)
-    }
-
-    @ViewBuilder
-    private func artwork(size: CGFloat, tint: Color) -> some View {
-        if let emotion = goal.emotion {
-            EmotionArtwork(emotion: emotion, size: size, decorative: false)
-        } else {
-            GoalIcon(symbol: goal.symbol, tint: tint, size: size)
-        }
-    }
-
-    private var metadata: String {
-        var parts = [goal.schedule.summary(calendar: calendar)]
-        if let emotion = goal.emotion { parts.append(emotion.displayName) }
-        if goal.reminderEnabled, let time = goal.reminderTime {
-            parts.append(time.formatted(date: .omitted, time: .shortened))
-        }
-        return parts.joined(separator: " · ")
+        .padding(.vertical, 4)
     }
 }

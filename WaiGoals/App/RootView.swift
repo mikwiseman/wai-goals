@@ -12,15 +12,15 @@ struct RootView: View {
 
     var body: some View {
         TabView(selection: $selection) {
-            Tab("Today", systemImage: "target", value: AppTab.today) {
+            Tab("Today", systemImage: "checklist", value: AppTab.today) {
                 TodayView()
                     .environment(\.dynamicTypeSize, preferredDynamicTypeSize)
             }
-            Tab("Goals", systemImage: "flag.fill", value: AppTab.goals) {
+            Tab("Goals", systemImage: "square.stack.3d.up.fill", value: AppTab.goals) {
                 GoalsListView()
                     .environment(\.dynamicTypeSize, preferredDynamicTypeSize)
             }
-            Tab("Stats", systemImage: "chart.bar.fill", value: AppTab.stats) {
+            Tab("Stats", systemImage: "chart.bar.xaxis", value: AppTab.stats) {
                 StatsView()
                     .environment(\.dynamicTypeSize, preferredDynamicTypeSize)
             }

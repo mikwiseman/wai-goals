@@ -5,14 +5,12 @@ import Charts
 struct TrendChartView: View {
     let points: [StatsCalculator.WeekPoint]
     var tint: Color = .accentColor
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var revealed = false
 
     var body: some View {
         Chart(points) { point in
             BarMark(
                 x: .value("Week", point.weekStart, unit: .weekOfYear),
-                y: .value("Completion", displayedRate(for: point))
+                y: .value("Completion", point.rate)
             )
             .foregroundStyle(tint.gradient)
             .cornerRadius(4)
@@ -36,21 +34,5 @@ struct TrendChartView: View {
             }
         }
         .frame(height: 168)
-        .onAppear {
-            if reduceMotion {
-                revealed = true
-            } else {
-                withAnimation(.spring(response: 0.72, dampingFraction: 0.86)) {
-                    revealed = true
-                }
-            }
-        }
-        .onChange(of: reduceMotion) { _, reduced in
-            if reduced { revealed = true }
-        }
-    }
-
-    private func displayedRate(for point: StatsCalculator.WeekPoint) -> Double {
-        reduceMotion || revealed ? point.rate : 0
     }
 }

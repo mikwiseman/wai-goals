@@ -5,7 +5,6 @@ struct GoalEditorView: View {
     @Environment(\.modelContext) private var context
     @Environment(\.dismiss) private var dismiss
     @Environment(NotificationScheduler.self) private var scheduler
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Query(sort: \Goal.sortIndex) private var allGoals: [Goal]
 
     private let editingGoal: Goal?
@@ -13,7 +12,6 @@ struct GoalEditorView: View {
     @State private var title: String
     @State private var symbol: String
     @State private var accent: AccentToken
-    @State private var emotion: GoalEmotion?
     @State private var scheduleType: ScheduleType
     @State private var weekdays: Set<Weekday>
     @State private var timesPerWeek: Int
@@ -27,7 +25,6 @@ struct GoalEditorView: View {
         _title = State(initialValue: goal?.title ?? "")
         _symbol = State(initialValue: goal?.symbol ?? "target")
         _accent = State(initialValue: goal?.accent ?? .default)
-        _emotion = State(initialValue: goal?.emotion)
         _scheduleType = State(initialValue: schedule.type)
         _weekdays = State(initialValue: schedule.weekdays.isEmpty ? [.monday, .wednesday, .friday] : schedule.weekdays)
         _timesPerWeek = State(initialValue: schedule.type == .timesPerWeek ? schedule.timesPerWeek : 3)
@@ -43,14 +40,10 @@ struct GoalEditorView: View {
         NavigationStack {
             Form {
                 previewSection
-                emotionSection
                 detailsSection
                 scheduleSection
                 reminderSection
             }
-            .formStyle(.grouped)
-            .scrollContentBackground(.hidden)
-            .background(AppBackground(tint: accent.color))
             .navigationTitle(editingGoal == nil ? "New Goal" : "Edit Goal")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -69,35 +62,15 @@ struct GoalEditorView: View {
 
     private var previewSection: some View {
         Section {
-            EscherWorldStage(
-                emotion: emotion,
-                title: title.isEmpty ? "Name the next stair" : title,
-                eyebrow: editingGoal == nil ? "New world" : "Refine this world",
-                message: emotion?.worldPrompt ?? "Choose how you want this goal to change you.",
-                progress: 0,
-                height: 344
-            )
-            .id(emotion)
-            .transition(reduceMotion ? .opacity : .opacity.combined(with: .scale(scale: 0.96)))
-            .overlay(alignment: .topLeading) {
-                GoalIcon(symbol: symbol, tint: accent.color, size: 40)
-                    .padding(Theme.Spacing.xl)
-                    .padding(.top, Theme.Spacing.xxl)
+            VStack(spacing: Theme.Spacing.s) {
+                GoalIcon(symbol: symbol, tint: accent.color, size: 64)
+                Text(title.isEmpty ? "New goal" : title)
+                    .font(.headline)
+                    .foregroundStyle(title.isEmpty ? .secondary : .primary)
             }
-            .listRowInsets(.init(top: Theme.Spacing.s, leading: 0,
-                                bottom: Theme.Spacing.s, trailing: 0))
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, Theme.Spacing.s)
             .listRowBackground(Color.clear)
-        }
-    }
-
-    private var emotionSection: some View {
-        Section {
-            EmotionPicker(selection: $emotion, tint: accent.color)
-                .padding(.vertical, Theme.Spacing.xs)
-        } header: {
-            Text("Choose the world")
-        } footer: {
-            Text("How do you want to feel as this goal becomes part of you?")
         }
     }
 
@@ -145,7 +118,7 @@ struct GoalEditorView: View {
                 .accessibilityAddTraits(accent == token ? .isSelected : [])
             }
         }
-        .animation(reduceMotion ? nil : .snappy(duration: 0.2), value: accent)
+        .animation(.snappy(duration: 0.2), value: accent)
     }
 
     private var scheduleSection: some View {
@@ -195,7 +168,7 @@ struct GoalEditorView: View {
 
     private var reminderSection: some View {
         Section("Reminder") {
-            Toggle("Remind me", isOn: $reminderEnabled.animation(reduceMotion ? nil : .default))
+            Toggle("Remind me", isOn: $reminderEnabled.animation())
             if reminderEnabled {
                 DatePicker("Time", selection: $reminderTime, displayedComponents: .hourAndMinute)
                 if scheduler.authorizationStatus == .denied {
@@ -212,7 +185,6 @@ struct GoalEditorView: View {
 
     private var canSave: Bool {
         !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
-        emotion != nil &&
         (scheduleType != .specificDays || !weekdays.isEmpty)
     }
 
@@ -232,13 +204,12 @@ struct GoalEditorView: View {
             goal.title = trimmed
             goal.symbol = symbol
             goal.colorToken = accent.rawValue
-            goal.emotion = emotion
             goal.schedule = schedule
             goal.reminderEnabled = reminderEnabled
             goal.reminderTime = time
         } else {
             let nextIndex = (allGoals.map(\.sortIndex).max() ?? -1) + 1
-            let goal = Goal(title: trimmed, symbol: symbol, color: accent, emotion: emotion, schedule: schedule,
+            let goal = Goal(title: trimmed, symbol: symbol, color: accent, schedule: schedule,
                             reminderEnabled: reminderEnabled, reminderTime: time, sortIndex: nextIndex)
             context.insert(goal)
         }
