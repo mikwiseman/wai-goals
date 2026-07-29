@@ -122,11 +122,13 @@ struct TodayView: View {
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, Theme.Spacing.xs)
+                    .entranceMotion(order: 0)
 
                 intentionSummary
+                    .entranceMotion(order: 1)
 
                 LazyVStack(spacing: Theme.Spacing.m) {
-                    ForEach(sortedDue) { goal in
+                    ForEach(Array(sortedDue.enumerated()), id: \.element.id) { index, goal in
                         let hasIntention = goal.hasIntention(on: today, calendar: calendar)
                         TodayGoalRow(
                             goal: goal,
@@ -138,6 +140,7 @@ struct TodayView: View {
                             onIntend: { intentionGoal = goal },
                             onOpen: { deepLinkedGoal = goal }
                         )
+                        .entranceMotion(order: index + 2)
                     }
                 }
             }
@@ -164,6 +167,7 @@ struct TodayView: View {
                     Image(systemName: "checkmark")
                         .font(.system(.largeTitle, design: .rounded).weight(.bold))
                         .foregroundStyle(.tint)
+                        .symbolEffect(.bounce, options: .nonRepeating, value: reduceMotion ? false : allDone)
                 } else {
                     VStack(spacing: 0) {
                         Text("\(doneCount)")

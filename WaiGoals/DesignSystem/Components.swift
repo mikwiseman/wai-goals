@@ -47,24 +47,29 @@ struct GoalJourneyArtwork: View {
 
 struct GoalIcon: View {
     let symbol: String
-    let tint: Color
+    let accent: AccentToken
     var size: CGFloat = 40
 
     var body: some View {
         ZStack {
             RoundedRectangle(cornerRadius: size * 0.28, style: .continuous)
-                .fill(.thinMaterial)
-            RoundedRectangle(cornerRadius: size * 0.28, style: .continuous)
-                .fill(tint.opacity(0.11))
+                .fill(
+                    LinearGradient(
+                        colors: accent.gradientColors,
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
             Image(systemName: symbol)
                 .font(.system(size: size * 0.46, weight: .semibold))
-                .foregroundStyle(tint)
+                .foregroundStyle(accent.gradientForeground)
         }
         .frame(width: size, height: size)
         .overlay {
             RoundedRectangle(cornerRadius: size * 0.28, style: .continuous)
-                .strokeBorder(.white.opacity(0.55), lineWidth: 0.75)
+                .strokeBorder(.white.opacity(0.38), lineWidth: 0.75)
         }
+        .shadow(color: accent.color.opacity(0.38), radius: size * 0.18, y: size * 0.08)
     }
 }
 
@@ -116,8 +121,17 @@ struct ProgressRing: View {
                 .stroke(tint.opacity(0.16), lineWidth: lineWidth)
             Circle()
                 .trim(from: 0, to: max(0.001, min(fraction, 1)))
-                .stroke(tint, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
+                .stroke(
+                    AngularGradient(
+                        colors: [tint.opacity(0.45), tint],
+                        center: .center,
+                        startAngle: .degrees(-90),
+                        endAngle: .degrees(270)
+                    ),
+                    style: StrokeStyle(lineWidth: lineWidth, lineCap: .round)
+                )
                 .rotationEffect(.degrees(-90))
+                .shadow(color: tint.opacity(0.40), radius: lineWidth * 0.45)
                 .animation(reduceMotion ? nil : .spring(response: 0.6, dampingFraction: 0.85), value: fraction)
         }
     }
@@ -131,10 +145,19 @@ struct StreakBadge: View {
     var tint: Color = .accentColor
     var showsLabel: Bool = false
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     var body: some View {
         HStack(spacing: 4) {
             Image(systemName: "flame.fill")
                 .font(.footnote.weight(.semibold))
+                .foregroundStyle(
+                    count > 0
+                        ? AnyShapeStyle(LinearGradient(colors: [.orange, .pink],
+                                                       startPoint: .top, endPoint: .bottom))
+                        : AnyShapeStyle(Color.secondary)
+                )
+                .symbolEffect(.bounce, options: .nonRepeating, value: reduceMotion ? 0 : count)
             Text("\(count)")
                 .font(.callout.weight(.bold))
                 .monospacedDigit()
@@ -158,14 +181,30 @@ struct CompletionButton: View {
     /// single control reads as both the goal's icon and its check target.
     var symbol: String? = nil
     var tint: Color = .accentColor
+    /// Second gradient stop for the filled state; defaults to a plain tint fill.
+    var partnerTint: Color? = nil
+    /// Foreground chosen against both filled-state gradient stops.
+    var foreground: Color = .white
     var size: CGFloat = 30
     let action: () -> Void
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// A one-shot expanding halo fired when the goal flips to done.
+    @State private var burst = false
+    @State private var burstOut = false
+    /// Guards the reset task against cancelling a newer burst when the user
+    /// taps again while a halo is still animating.
+    @State private var burstGeneration = 0
 
     var body: some View {
         Button(action: action) {
             ZStack {
+                if burst {
+                    Circle()
+                        .stroke(tint.opacity(burstOut ? 0 : 0.65), lineWidth: 2)
+                        .frame(width: size, height: size)
+                        .scaleEffect(burstOut ? 2.1 : 1)
+                }
                 Circle()
                     .stroke(isDone ? tint : Color.secondary.opacity(0.35), lineWidth: 2.5)
                     .frame(width: size, height: size)
@@ -177,13 +216,20 @@ struct CompletionButton: View {
                         .scaleEffect(isDone ? 0.5 : 1)
                 }
                 Circle()
-                    .fill(tint)
+                    .fill(
+                        LinearGradient(
+                            colors: [tint, partnerTint ?? tint],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
                     .frame(width: size, height: size)
+                    .shadow(color: tint.opacity(0.45), radius: 7, y: 3)
                     .scaleEffect(isDone ? 1 : 0.01)
                     .opacity(isDone ? 1 : 0)
                 Image(systemName: "checkmark")
                     .font(.system(size: size * 0.5, weight: .bold))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(foreground)
                     .scaleEffect(isDone ? 1 : 0.2)
                     .opacity(isDone ? 1 : 0)
             }
@@ -193,6 +239,21 @@ struct CompletionButton: View {
         }
         .buttonStyle(.plain)
         .sensoryFeedback(trigger: isDone) { _, now in now ? .success : .impact(weight: .light) }
+        .onChange(of: isDone) { _, now in
+            guard now, !reduceMotion else { return }
+            burstGeneration += 1
+            let generation = burstGeneration
+            burst = true
+            burstOut = false
+            withAnimation(.easeOut(duration: 0.55)) {
+                burstOut = true
+            }
+            Task { @MainActor in
+                try? await Task.sleep(for: .milliseconds(600))
+                guard burstGeneration == generation else { return }
+                burst = false
+            }
+        }
         .accessibilityLabel(isDone ? "Completed" : "Mark complete")
         .accessibilityAddTraits(isDone ? .isSelected : [])
     }

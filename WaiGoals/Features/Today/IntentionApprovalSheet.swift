@@ -37,7 +37,7 @@ struct IntentionApprovalSheet: View {
 
     private var header: some View {
         HStack(spacing: Theme.Spacing.m) {
-            GoalIcon(symbol: goal.symbol, tint: goal.accent.color, size: 52)
+            GoalIcon(symbol: goal.symbol, accent: goal.accent, size: 52)
             VStack(alignment: .leading, spacing: 4) {
                 Text(goal.title)
                     .font(.headline)

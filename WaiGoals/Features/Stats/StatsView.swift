@@ -73,17 +73,20 @@ struct StatsView: View {
 
     private var tiles: some View {
         HStack(spacing: Theme.Spacing.m) {
-            statTile(value: "\(active.count)", label: "Goals", symbol: "flag.fill")
-            statTile(value: "\(longestStreak)", label: "Best streak", symbol: "flame.fill")
-            statTile(value: "\(totalCompletions)", label: "Check-ins", symbol: "checkmark.seal.fill")
+            statTile(value: "\(active.count)", label: "Goals", symbol: "flag.fill",
+                     tint: AccentToken.indigo.color)
+            statTile(value: "\(longestStreak)", label: "Best streak", symbol: "flame.fill",
+                     tint: AccentToken.amber.partnerColor)
+            statTile(value: "\(totalCompletions)", label: "Check-ins", symbol: "checkmark.seal.fill",
+                     tint: AccentToken.green.color)
         }
     }
 
-    private func statTile(value: String, label: String, symbol: String) -> some View {
+    private func statTile(value: String, label: String, symbol: String, tint: Color) -> some View {
         VStack(spacing: 6) {
             Image(systemName: symbol)
                 .font(.subheadline)
-                .foregroundStyle(.tint)
+                .foregroundStyle(tint)
             Text(value)
                 .font(.system(.title2, design: .rounded).weight(.bold))
                 .monospacedDigit()
@@ -118,7 +121,7 @@ struct StatsView: View {
             VStack(spacing: Theme.Spacing.m) {
                 ForEach(streakRanking, id: \.0.id) { goal, streak in
                     HStack(spacing: Theme.Spacing.m) {
-                        GoalIcon(symbol: goal.symbol, tint: goal.accent.color, size: 34)
+                        GoalIcon(symbol: goal.symbol, accent: goal.accent, size: 34)
                         Text(goal.title).font(.subheadline.weight(.medium)).lineLimit(1)
                         Spacer(minLength: Theme.Spacing.s)
                         StreakBadge(count: streak.current, unit: streak.unit, tint: goal.accent.color, showsLabel: true)

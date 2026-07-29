@@ -136,7 +136,7 @@ struct GoalListRow: View {
     var body: some View {
         let tint = goal.accent.color
         HStack(spacing: Theme.Spacing.m) {
-            GoalIcon(symbol: goal.symbol, tint: tint, size: 40)
+            GoalIcon(symbol: goal.symbol, accent: goal.accent, size: 40)
             VStack(alignment: .leading, spacing: 3) {
                 Text(goal.title)
                     .font(.body.weight(.semibold))
