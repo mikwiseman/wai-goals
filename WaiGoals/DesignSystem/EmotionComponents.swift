@@ -217,7 +217,7 @@ private struct EntranceMotionModifier: ViewModifier {
                 if reduceMotion {
                     visible = true
                 } else {
-                    withAnimation(.spring(response: 0.58, dampingFraction: 0.88).delay(Double(order) * 0.055)) {
+                    withAnimation(.spring(response: 0.58, dampingFraction: 0.88).delay(WaiMotion.entranceDelay(order: order))) {
                         visible = true
                     }
                 }

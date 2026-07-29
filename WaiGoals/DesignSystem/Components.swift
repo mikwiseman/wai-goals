@@ -62,7 +62,7 @@ struct GoalIcon: View {
                 )
             Image(systemName: symbol)
                 .font(.system(size: size * 0.46, weight: .semibold))
-                .foregroundStyle(accent.contrastingForeground)
+                .foregroundStyle(accent.gradientForeground)
         }
         .frame(width: size, height: size)
         .overlay {
@@ -183,6 +183,8 @@ struct CompletionButton: View {
     var tint: Color = .accentColor
     /// Second gradient stop for the filled state; defaults to a plain tint fill.
     var partnerTint: Color? = nil
+    /// Foreground chosen against both filled-state gradient stops.
+    var foreground: Color = .white
     var size: CGFloat = 30
     let action: () -> Void
 
@@ -227,7 +229,7 @@ struct CompletionButton: View {
                     .opacity(isDone ? 1 : 0)
                 Image(systemName: "checkmark")
                     .font(.system(size: size * 0.5, weight: .bold))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(foreground)
                     .scaleEffect(isDone ? 1 : 0.2)
                     .opacity(isDone ? 1 : 0)
             }

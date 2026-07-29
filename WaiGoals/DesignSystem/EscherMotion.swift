@@ -6,6 +6,11 @@ enum WaiMotion {
     static let quick = Animation.snappy(duration: 0.24, extraBounce: 0.06)
     static let spatial = Animation.spring(response: 0.62, dampingFraction: 0.84)
     static let reveal = Animation.spring(response: 0.82, dampingFraction: 0.82)
+
+    /// Keeps lazy rows responsive even when their list index is large.
+    static func entranceDelay(order: Int) -> TimeInterval {
+        Double(min(max(order, 0), 8)) * 0.055
+    }
 }
 
 extension GoalEmotion {

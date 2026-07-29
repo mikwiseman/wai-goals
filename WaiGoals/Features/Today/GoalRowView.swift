@@ -27,6 +27,7 @@ struct TodayGoalRow: View {
                 symbol: goal.symbol,
                 tint: tint,
                 partnerTint: goal.accent.partnerColor,
+                foreground: goal.accent.gradientForeground,
                 size: 46,
                 action: onToggle
             )

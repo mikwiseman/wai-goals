@@ -58,11 +58,45 @@ enum AccentToken: String, CaseIterable, Identifiable, Sendable {
     /// Two-stop gradient from the accent toward its partner hue.
     var gradientColors: [Color] { [color, partnerColor] }
 
+    /// Black or white, selected against both gradient stops using WCAG
+    /// relative luminance so symbols remain legible across the whole fill.
+    var gradientForeground: Color {
+        blackGradientContrast >= whiteGradientContrast ? .black : .white
+    }
+
+    /// Exposed for a regression test that enforces the 3:1 graphical contrast
+    /// target across every accent gradient.
+    var minimumGradientForegroundContrast: Double {
+        max(blackGradientContrast, whiteGradientContrast)
+    }
+
     /// Black or white, whichever is legible on top of `color` — used for
     /// checkmarks/labels drawn over an accent fill (e.g. light amber/lime).
     var contrastingForeground: Color {
         let luminance = 0.2126 * rgb.r + 0.7152 * rgb.g + 0.0722 * rgb.b
         return luminance > 0.6 ? .black : .white
+    }
+
+    private var blackGradientContrast: Double {
+        let darkerStop = min(Self.relativeLuminance(rgb), Self.relativeLuminance(partnerRGB))
+        return (darkerStop + 0.05) / 0.05
+    }
+
+    private var whiteGradientContrast: Double {
+        let lighterStop = max(Self.relativeLuminance(rgb), Self.relativeLuminance(partnerRGB))
+        return 1.05 / (lighterStop + 0.05)
+    }
+
+    private static func relativeLuminance(_ rgb: (r: Double, g: Double, b: Double)) -> Double {
+        func linearized(_ component: Double) -> Double {
+            component <= 0.04045
+                ? component / 12.92
+                : pow((component + 0.055) / 1.055, 2.4)
+        }
+
+        return 0.2126 * linearized(rgb.r)
+            + 0.7152 * linearized(rgb.g)
+            + 0.0722 * linearized(rgb.b)
     }
 
     static let `default` = AccentToken.indigo

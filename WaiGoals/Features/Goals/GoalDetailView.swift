@@ -8,6 +8,7 @@ struct GoalDetailView: View {
     @Environment(\.modelContext) private var context
     @Environment(\.dismiss) private var dismiss
     @Environment(NotificationScheduler.self) private var scheduler
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     @State private var showingEditor = false
     @State private var milestone: MilestoneInfo?
@@ -116,7 +117,7 @@ struct GoalDetailView: View {
         .tint(tint)
         .controlSize(.large)
         .shadow(color: tint.opacity(isDone ? 0 : 0.40), radius: 12, y: 5)
-        .animation(.easeOut(duration: 0.25), value: isDone)
+        .animation(reduceMotion ? nil : .easeOut(duration: 0.25), value: isDone)
         .sensoryFeedback(trigger: isDone) { _, now in now ? .success : .impact(weight: .light) }
     }
 
