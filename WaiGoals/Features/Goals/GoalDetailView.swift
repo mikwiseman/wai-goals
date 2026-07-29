@@ -88,7 +88,7 @@ struct GoalDetailView: View {
 
     private func header(tint: Color) -> some View {
         VStack(spacing: Theme.Spacing.m) {
-            GoalIcon(symbol: goal.symbol, tint: tint, size: 72)
+            GoalIcon(symbol: goal.symbol, accent: goal.accent, size: 72)
             VStack(spacing: 4) {
                 Text(goal.title)
                     .font(.title2.weight(.bold))
@@ -115,6 +115,8 @@ struct GoalDetailView: View {
         .buttonStyle(.borderedProminent)
         .tint(tint)
         .controlSize(.large)
+        .shadow(color: tint.opacity(isDone ? 0 : 0.40), radius: 12, y: 5)
+        .animation(.easeOut(duration: 0.25), value: isDone)
         .sensoryFeedback(trigger: isDone) { _, now in now ? .success : .impact(weight: .light) }
     }
 

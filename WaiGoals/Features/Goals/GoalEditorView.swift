@@ -63,7 +63,7 @@ struct GoalEditorView: View {
     private var previewSection: some View {
         Section {
             VStack(spacing: Theme.Spacing.s) {
-                GoalIcon(symbol: symbol, tint: accent.color, size: 64)
+                GoalIcon(symbol: symbol, accent: accent, size: 64)
                 Text(title.isEmpty ? "New goal" : title)
                     .font(.headline)
                     .foregroundStyle(title.isEmpty ? .secondary : .primary)

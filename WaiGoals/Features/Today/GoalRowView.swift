@@ -26,6 +26,7 @@ struct TodayGoalRow: View {
                 isDone: isDone,
                 symbol: goal.symbol,
                 tint: tint,
+                partnerTint: goal.accent.partnerColor,
                 size: 46,
                 action: onToggle
             )
@@ -74,7 +75,7 @@ struct TodayGoalRow: View {
         }
         .scaleEffect(reduceMotion || !isCelebrating ? 1 : 1.012)
         .animation(reduceMotion ? nil : WaiMotion.quick, value: isCelebrating)
-        .card()
+        .card(tint: tint)
     }
 
     private func goalSummary(streak: StreakResult) -> some View {
