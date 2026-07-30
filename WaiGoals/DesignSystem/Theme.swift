@@ -26,58 +26,36 @@ enum Theme {
 
 // MARK: - Background
 
-/// A living field of colour under the system's Liquid Glass navigation layer:
-/// three slow-drifting accent glows over the grouped background. Motion and
-/// transparency fall back to a calm static wash when the user asks for less.
+/// A quiet field of light under the system's Liquid Glass navigation layer.
 struct AppBackground: View {
     var tint: Color = .accentColor
     @Environment(\.colorScheme) private var scheme
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         ZStack {
             Color(.systemGroupedBackground).ignoresSafeArea()
             if !reduceTransparency {
-                if reduceMotion {
-                    glowField
-                } else {
-                    glowField
-                        .phaseAnimator([false, true]) { content, drift in
-                            content
-                                .offset(x: drift ? 24 : -20, y: drift ? -18 : 22)
-                                .scaleEffect(drift ? 1.07 : 1.0)
-                        } animation: { drift in
-                            .easeInOut(duration: drift ? 9 : 11)
-                        }
-                }
+                LinearGradient(
+                    colors: [
+                        tint.opacity(scheme == .dark ? 0.20 : 0.13),
+                        Color.blue.opacity(scheme == .dark ? 0.08 : 0.045),
+                        .clear
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: UnitPoint(x: 0.72, y: 0.56)
+                )
+                .ignoresSafeArea()
+
+                RadialGradient(
+                    colors: [tint.opacity(scheme == .dark ? 0.14 : 0.08), .clear],
+                    center: UnitPoint(x: 0.88, y: 0.04),
+                    startRadius: 0,
+                    endRadius: 420
+                )
+                .ignoresSafeArea()
             }
         }
-    }
-
-    private var glowField: some View {
-        let dark = scheme == .dark
-        return ZStack {
-            RadialGradient(
-                colors: [tint.opacity(dark ? 0.34 : 0.22), .clear],
-                center: UnitPoint(x: 0.10, y: 0.0),
-                startRadius: 0,
-                endRadius: 520
-            )
-            RadialGradient(
-                colors: [AccentToken.violet.partnerColor.opacity(dark ? 0.26 : 0.15), .clear],
-                center: UnitPoint(x: 0.98, y: 0.22),
-                startRadius: 0,
-                endRadius: 460
-            )
-            RadialGradient(
-                colors: [AccentToken.blue.partnerColor.opacity(dark ? 0.22 : 0.12), .clear],
-                center: UnitPoint(x: 0.28, y: 1.04),
-                startRadius: 0,
-                endRadius: 560
-            )
-        }
-        .ignoresSafeArea()
     }
 }
 
