@@ -6,6 +6,11 @@ enum WaiMotion {
     static let quick = Animation.snappy(duration: 0.24, extraBounce: 0.06)
     static let spatial = Animation.spring(response: 0.62, dampingFraction: 0.84)
     static let reveal = Animation.spring(response: 0.82, dampingFraction: 0.82)
+    /// Button press feedback — quick dip with a hint of spring on release.
+    static let press = Animation.snappy(duration: 0.22, extraBounce: 0.06)
+    /// One-shot confirmation pops (intention seal, milestone card) — lands with
+    /// a gentle overshoot, like a stamp.
+    static let pop = Animation.spring(response: 0.44, dampingFraction: 0.62)
 
     /// Keeps lazy rows responsive even when their list index is large.
     static func entranceDelay(order: Int) -> TimeInterval {

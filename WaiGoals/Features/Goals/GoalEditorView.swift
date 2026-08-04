@@ -113,7 +113,7 @@ struct GoalEditorView: View {
                         .frame(maxWidth: .infinity, minHeight: 44) // 44pt hit target
                         .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.waiPressable(scale: 0.82))
                 .accessibilityLabel(token.displayName)
                 .accessibilityAddTraits(accent == token ? .isSelected : [])
             }
@@ -158,12 +158,13 @@ struct GoalEditorView: View {
                         .frame(maxWidth: .infinity, minHeight: 44) // 44pt hit target
                         .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.waiPressable(scale: 0.82))
                 .accessibilityLabel(weekday.shortSymbol())
                 .accessibilityAddTraits(isOn ? .isSelected : [])
             }
         }
         .padding(.vertical, 4)
+        .animation(.snappy(duration: 0.2), value: weekdays)
     }
 
     private var reminderSection: some View {

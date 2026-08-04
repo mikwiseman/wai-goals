@@ -154,7 +154,7 @@ struct EmotionPicker: View {
             }
             .scaleEffect(selected ? 1 : 0.965)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.waiPressable(scale: 0.94))
         .accessibilityLabel("\(emotion.displayName), \(emotion.feeling)")
         .accessibilityAddTraits(selected ? .isSelected : [])
     }
@@ -196,7 +196,7 @@ struct EmotionPicker: View {
             .background(selected ? tint.opacity(0.13) : Color(.tertiarySystemFill),
                         in: RoundedRectangle(cornerRadius: Theme.Radius.card, style: .continuous))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.waiPressable(scale: 0.97))
         .accessibilityLabel("\(emotion.displayName), \(emotion.feeling)")
         .accessibilityAddTraits(selected ? .isSelected : [])
     }

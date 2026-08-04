@@ -72,7 +72,7 @@ private struct SymbolCell: View {
                 .frame(width: 60, height: 60)
                 .background(background)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.waiPressable(scale: 0.84))
     }
 
     private var background: some View {

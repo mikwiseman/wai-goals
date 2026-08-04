@@ -48,6 +48,8 @@ struct TodayGoalRow: View {
                             systemImage: hasIntention ? "checkmark.seal.fill" : "target"
                         )
                         .font(.caption.weight(.semibold))
+                        .symbolEffect(.bounce, options: .nonRepeating,
+                                      value: reduceMotion ? false : hasIntention)
                         .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 1)
                         .minimumScaleFactor(0.8)
                         .padding(.horizontal, Theme.Spacing.m)
@@ -61,8 +63,9 @@ struct TodayGoalRow: View {
                                 .strokeBorder(tint.opacity(hasIntention ? 0.55 : 0.28), lineWidth: 1)
                         )
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.waiPressable(scale: 0.93))
                     .foregroundStyle(tint)
+                    .animation(reduceMotion ? nil : WaiMotion.quick, value: hasIntention)
                     .accessibilityLabel(intentionAccessibilityLabel)
                 }
             }
@@ -109,7 +112,7 @@ struct TodayGoalRow: View {
             }
             .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.waiPressable(scale: 0.98))
         .accessibilityLabel(accessibilityLabel(streak: streak))
         .accessibilityHint("Opens details")
     }

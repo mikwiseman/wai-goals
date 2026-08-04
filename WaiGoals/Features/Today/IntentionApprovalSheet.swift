@@ -7,6 +7,10 @@ struct IntentionApprovalSheet: View {
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// Drives the seal "stamp" that lands on the pledge right after approval,
+    /// just before the sheet dismisses itself.
+    @State private var approved = false
 
     init(goal: Goal, date: Date = .now, calendar: Calendar = .current) {
         self.goal = goal
@@ -62,20 +66,42 @@ struct IntentionApprovalSheet: View {
         .padding(Theme.Spacing.xl)
         .frame(maxWidth: .infinity, alignment: .leading)
         .card(cornerRadius: Theme.Radius.button)
+        .overlay(alignment: .bottomTrailing) {
+            if approved {
+                Image(systemName: "checkmark.seal.fill")
+                    .font(.system(size: 46, weight: .bold))
+                    .foregroundStyle(goal.accent.color.gradient)
+                    .shadow(color: goal.accent.color.opacity(0.5), radius: 10, y: 4)
+                    .padding(Theme.Spacing.m)
+                    .transition(.scale(scale: 0.2).combined(with: .opacity))
+                    .accessibilityHidden(true)
+            }
+        }
     }
 
     private var approveButton: some View {
         Button {
+            guard !approved else { return }
             goal.approveIntention(on: day, context: context, calendar: calendar)
             Haptics.success()
-            dismiss()
+            if reduceMotion {
+                dismiss()
+            } else {
+                withAnimation(WaiMotion.pop) { approved = true }
+                Task { @MainActor in
+                    try? await Task.sleep(for: .milliseconds(640))
+                    dismiss()
+                }
+            }
         } label: {
-            Label("Approve", systemImage: "checkmark.seal.fill")
+            Label("Approve", systemImage: approved ? "checkmark.seal.fill" : "checkmark.seal")
                 .font(.headline)
                 .frame(maxWidth: .infinity)
+                .symbolEffect(.bounce, options: .nonRepeating, value: approved)
         }
         .waiGlassButton(prominent: true)
         .tint(goal.accent.color)
         .controlSize(.large)
+        .disabled(approved)
     }
 }

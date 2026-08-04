@@ -1,5 +1,31 @@
 import SwiftUI
 
+// MARK: - Press feedback
+
+/// Shared press feedback for custom buttons: a quick physical dip with a
+/// springy release. System-styled buttons (glass, bordered) already carry
+/// native press interactions, so this style is for controls that would
+/// otherwise use `.plain` and feel dead.
+struct WaiPressableStyle: ButtonStyle {
+    /// Scale while pressed. Keep within 0.78–0.99: smaller for compact tappable
+    /// dots/cells, closer to 1 for large rows and cards.
+    var scale: CGFloat = 0.96
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(reduceMotion ? 1 : (configuration.isPressed ? scale : 1))
+            .animation(reduceMotion ? nil : WaiMotion.press, value: configuration.isPressed)
+    }
+}
+
+extension ButtonStyle where Self == WaiPressableStyle {
+    static func waiPressable(scale: CGFloat = 0.96) -> WaiPressableStyle {
+        WaiPressableStyle(scale: scale)
+    }
+}
+
 // MARK: - Milestones
 
 /// Streak values worth celebrating.
@@ -230,14 +256,16 @@ struct CompletionButton: View {
                 Image(systemName: "checkmark")
                     .font(.system(size: size * 0.5, weight: .bold))
                     .foregroundStyle(foreground)
+                    .rotationEffect(.degrees(isDone ? 0 : -24))
                     .scaleEffect(isDone ? 1 : 0.2)
                     .opacity(isDone ? 1 : 0)
+                    .symbolEffect(.bounce, options: .nonRepeating, value: reduceMotion ? false : isDone)
             }
             .animation(reduceMotion ? nil : .spring(response: 0.32, dampingFraction: 0.6), value: isDone)
             .frame(minWidth: 44, minHeight: 44) // ensure a comfortable hit target
             .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.waiPressable(scale: 0.86))
         .sensoryFeedback(trigger: isDone) { _, now in now ? .success : .impact(weight: .light) }
         .onChange(of: isDone) { _, now in
             guard now, !reduceMotion else { return }
@@ -267,6 +295,8 @@ struct DayDot: View {
     var isToday: Bool = false
     var size: CGFloat = 26
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     var body: some View {
         Circle()
             .fill(fill)
@@ -282,6 +312,7 @@ struct DayDot: View {
             .overlay(
                 Circle().strokeBorder(isToday ? tint : .clear, lineWidth: 2)
             )
+            .animation(reduceMotion ? nil : WaiMotion.quick, value: state)
     }
 
     private var fill: Color {
@@ -299,6 +330,9 @@ struct WeekStrip: View {
     let completedDays: Set<Date>
     var tint: Color = .accentColor
     var calendar: Calendar = .current
+    /// When set, today and past days become tappable so the user can mark or
+    /// unmark completions retroactively. Future days stay inert.
+    var onToggleDay: ((Date) -> Void)? = nil
 
     var body: some View {
         let today = calendar.startOfDay(for: .now)
@@ -311,17 +345,35 @@ struct WeekStrip: View {
                 let state = StatsCalculator.dayState(schedule: schedule, completedDays: completedDays,
                                                      on: day, asOf: today, calendar: calendar)
                 let isToday = calendar.isDate(day, inSameDayAs: today)
-                VStack(spacing: 6) {
-                    Text(Weekday.from(day, calendar: calendar).veryShortSymbol(calendar: calendar))
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                    DayDot(state: state, tint: tint, isToday: isToday)
+                if let onToggleDay, day <= today {
+                    Button { onToggleDay(day) } label: {
+                        column(day: day, state: state, tint: tint, isToday: isToday)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.waiPressable(scale: 0.8))
+                    .accessibilityLabel(day.formatted(.dateTime.weekday(.wide)))
+                    .accessibilityValue(state.accessibilityDescription)
+                    .accessibilityHint(state == .completed
+                                       ? "Double-tap to unmark this day"
+                                       : "Double-tap to mark this day done")
+                    .frame(maxWidth: .infinity)
+                } else {
+                    column(day: day, state: state, tint: tint, isToday: isToday)
+                        .frame(maxWidth: .infinity)
+                        .accessibilityElement(children: .ignore)
+                        .accessibilityLabel(day.formatted(.dateTime.weekday(.wide)))
+                        .accessibilityValue(state.accessibilityDescription)
                 }
-                .frame(maxWidth: .infinity)
-                .accessibilityElement(children: .ignore)
-                .accessibilityLabel(day.formatted(.dateTime.weekday(.wide)))
-                .accessibilityValue(state.accessibilityDescription)
             }
+        }
+    }
+
+    private func column(day: Date, state: DayState, tint: Color, isToday: Bool) -> some View {
+        VStack(spacing: 6) {
+            Text(Weekday.from(day, calendar: calendar).veryShortSymbol(calendar: calendar))
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+            DayDot(state: state, tint: tint, isToday: isToday)
         }
     }
 }
@@ -385,6 +437,7 @@ struct MilestoneOverlay: View {
     let onDismiss: () -> Void
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var appeared = false
 
     var body: some View {
         ZStack {
@@ -405,6 +458,8 @@ struct MilestoneOverlay: View {
                     Image(systemName: "flame.fill")
                         .font(.system(size: 48, weight: .bold))
                         .foregroundStyle(.white)
+                        .symbolEffect(.bounce, options: .nonRepeating,
+                                      value: reduceMotion ? false : appeared)
                 }
                 VStack(spacing: 6) {
                     Text("\(streak) \(unit.label(for: streak)) in a row!")
@@ -427,6 +482,15 @@ struct MilestoneOverlay: View {
                 in: RoundedRectangle(cornerRadius: Theme.Radius.hero, style: .continuous)
             )
             .padding(Theme.Spacing.xxxl)
+            .scaleEffect(reduceMotion || appeared ? 1 : 0.86)
+            .opacity(appeared ? 1 : 0)
+        }
+        .onAppear {
+            if reduceMotion {
+                appeared = true
+            } else {
+                withAnimation(WaiMotion.pop) { appeared = true }
+            }
         }
     }
 }

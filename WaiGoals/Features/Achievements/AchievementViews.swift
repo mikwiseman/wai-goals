@@ -100,7 +100,7 @@ struct AchievementCard: View {
             .card()
             .matchedTransitionSource(id: progress.id, in: namespace)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.waiPressable(scale: 0.95))
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(progress.id.title)
         .accessibilityValue(progress.isUnlocked ? "Discovered. \(progress.id.shortMeaning)" : progress.progressLabel)

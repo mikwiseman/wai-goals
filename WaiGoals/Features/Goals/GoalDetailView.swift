@@ -149,7 +149,7 @@ struct GoalDetailView: View {
             .padding(Theme.Spacing.l)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.waiPressable(scale: 0.98))
         .card()
         .accessibilityLabel(intention == nil ? "Approve intention for \(goal.title)" :
                             "Review intention for \(goal.title)")
@@ -192,7 +192,8 @@ struct GoalDetailView: View {
     private func weekCard(completed: Set<Date>, tint: Color) -> some View {
         VStack(alignment: .leading, spacing: Theme.Spacing.m) {
             Text("This week").font(.headline)
-            WeekStrip(schedule: goal.schedule, completedDays: completed, tint: tint, calendar: calendar)
+            WeekStrip(schedule: goal.schedule, completedDays: completed, tint: tint,
+                      calendar: calendar, onToggleDay: { toggleDay($0, tint: tint) })
         }
         .padding(Theme.Spacing.l)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -202,8 +203,9 @@ struct GoalDetailView: View {
     private func heatmapCard(completed: Set<Date>, tint: Color) -> some View {
         VStack(alignment: .leading, spacing: Theme.Spacing.m) {
             Text("History").font(.headline)
-            HeatmapView(schedule: goal.schedule, completedDays: completed, tint: tint, calendar: calendar)
-            Text("Last 18 weeks")
+            HeatmapView(schedule: goal.schedule, completedDays: completed, tint: tint,
+                        calendar: calendar, onToggleDay: { toggleDay($0, tint: tint) })
+            Text("Tap a past day to mark it done · Last 18 weeks")
                 .font(.caption2)
                 .foregroundStyle(.tertiary)
         }
@@ -261,19 +263,36 @@ struct GoalDetailView: View {
     // MARK: - Actions
 
     private func toggleToday(tint: Color) {
+        performToggle(on: today, tint: tint, hapticOnDone: false)
+    }
+
+    /// Retroactive toggle from the week strip / history heatmap: lets the user
+    /// mark (or unmark) any past day, e.g. "I actually did this yesterday".
+    private func toggleDay(_ day: Date, tint: Color) {
+        performToggle(on: day, tint: tint, hapticOnDone: true)
+    }
+
+    private func performToggle(on day: Date, tint: Color, hapticOnDone: Bool) {
         let before = AchievementSnapshot(goals: allGoals, calendar: calendar)
-        let wasDone = goal.isCompleted(on: today, calendar: calendar)
-        let newStreak = goal.toggleCompletion(on: today, context: context, calendar: calendar)
+        let wasDone = goal.isCompleted(on: day, calendar: calendar)
+        let newStreak = goal.toggleCompletion(on: day, context: context, calendar: calendar)
         let achievements = wasDone ? [] : AchievementEngine.newlyUnlocked(
             before: before,
-            after: before.addingCompletion(to: goal.id, on: today, calendar: calendar),
+            after: before.addingCompletion(to: goal.id, on: day, calendar: calendar),
             excluding: Set(context.allAchievementUnlocks().compactMap(\.achievement)),
-            asOf: today,
+            asOf: day,
             calendar: calendar
         )
         AchievementUnlockStore.record(achievements.map(\.id), context: context)
 
-        if let newStreak, Milestone.reached(newStreak) {
+        let reachedMilestone = newStreak.map { Milestone.reached($0) } ?? false
+        // Day toggles carry no `.sensoryFeedback` of their own (the "Mark done"
+        // button already has one), so fire an explicit haptic for them.
+        if !wasDone, hapticOnDone, !reachedMilestone {
+            Haptics.success()
+        }
+
+        if let newStreak, reachedMilestone {
             Haptics.success()
             withAnimation {
                 milestone = MilestoneInfo(streak: newStreak, unit: goal.schedule.streakUnit, accent: goal.accent)
