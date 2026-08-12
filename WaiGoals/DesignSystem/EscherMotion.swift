@@ -11,6 +11,12 @@ enum WaiMotion {
     /// One-shot confirmation pops (intention seal, milestone card) — lands with
     /// a gentle overshoot, like a stamp.
     static let pop = Animation.spring(response: 0.44, dampingFraction: 0.62)
+    /// The intention seal pressing onto the pledge — faster and firmer than
+    /// `pop`, so it reads as a stamp landing rather than a bubble inflating.
+    static let stamp = Animation.spring(response: 0.34, dampingFraction: 0.58)
+    /// Day-to-day paging on Today — spatial but brisk, so stepping through
+    /// history never feels slower than the tap that caused it.
+    static let page = Animation.spring(response: 0.42, dampingFraction: 0.86)
 
     /// Keeps lazy rows responsive even when their list index is large.
     static func entranceDelay(order: Int) -> TimeInterval {

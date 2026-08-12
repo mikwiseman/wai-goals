@@ -230,6 +230,21 @@ struct CompletionButton: View {
                         .stroke(tint.opacity(burstOut ? 0 : 0.65), lineWidth: 2)
                         .frame(width: size, height: size)
                         .scaleEffect(burstOut ? 2.1 : 1)
+
+                    // A ring of sparks thrown outward with the halo — each one
+                    // travels along its own spoke and fades as it flies.
+                    ForEach(0..<8, id: \.self) { index in
+                        let angle = Double(index) / 8 * 2 * .pi - .pi / 2
+                        Capsule(style: .continuous)
+                            .fill(index.isMultiple(of: 2) ? tint : (partnerTint ?? tint))
+                            .frame(width: 3.5, height: burstOut ? 4 : 9)
+                            .rotationEffect(.radians(angle + .pi / 2))
+                            .offset(
+                                x: cos(angle) * size * (burstOut ? 1.45 : 0.55),
+                                y: sin(angle) * size * (burstOut ? 1.45 : 0.55)
+                            )
+                            .opacity(burstOut ? 0 : 0.9)
+                    }
                 }
                 Circle()
                     .stroke(isDone ? tint : Color.secondary.opacity(0.35), lineWidth: 2.5)
@@ -485,6 +500,77 @@ struct MilestoneOverlay: View {
             .scaleEffect(reduceMotion || appeared ? 1 : 0.86)
             .opacity(appeared ? 1 : 0)
         }
+        .onAppear {
+            if reduceMotion {
+                appeared = true
+            } else {
+                withAnimation(WaiMotion.pop) { appeared = true }
+            }
+        }
+    }
+}
+
+// MARK: - All-done celebration
+
+/// A non-blocking celebration for finishing every goal of the day: confetti
+/// rains once while a glass capsule drops in from the top, then the presenting
+/// view fades the whole moment away. Never intercepts touches, so the user can
+/// keep moving while the room applauds.
+struct AllDoneCelebrationView: View {
+    var tint: Color = .accentColor
+    var partnerTint: Color? = nil
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var appeared = false
+
+    var body: some View {
+        ZStack(alignment: .top) {
+            if !reduceMotion {
+                ConfettiView()
+            }
+
+            HStack(spacing: Theme.Spacing.s) {
+                Image(systemName: "checkmark.seal.fill")
+                    .font(.body.weight(.bold))
+                    .foregroundStyle(.white)
+                    .padding(7)
+                    .background(
+                        Circle().fill(
+                            LinearGradient(
+                                colors: [tint, partnerTint ?? tint],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                    )
+                    .symbolEffect(.bounce, options: .nonRepeating,
+                                  value: reduceMotion ? false : appeared)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("All done for today")
+                        .font(.subheadline.weight(.bold))
+                    Text("Every goal checked off. Nice work.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .padding(.vertical, Theme.Spacing.xs)
+            .padding(.leading, Theme.Spacing.xs + 2)
+            .padding(.trailing, Theme.Spacing.l)
+            .background(.regularMaterial, in: Capsule(style: .continuous))
+            .overlay(
+                Capsule(style: .continuous)
+                    .strokeBorder(tint.opacity(0.4), lineWidth: 1)
+            )
+            .shadow(color: tint.opacity(0.35), radius: 16, y: 8)
+            .scaleEffect(appeared || reduceMotion ? 1 : 0.9)
+            .offset(y: appeared || reduceMotion ? 0 : -24)
+            .opacity(appeared ? 1 : 0)
+            .padding(.top, Theme.Spacing.s)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("All goals done for today")
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .allowsHitTesting(false)
         .onAppear {
             if reduceMotion {
                 appeared = true
