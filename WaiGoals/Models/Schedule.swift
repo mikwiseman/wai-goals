@@ -33,6 +33,8 @@ struct Schedule: Equatable, Sendable {
     }
 
     static let daily = Schedule(type: .daily)
+    /// Every day except Saturday — the default for new goals.
+    static let workdays = Schedule(type: .specificDays, weekdays: Weekday.workdays)
 
     /// Whether the goal is *due* on the given date.
     ///
@@ -56,7 +58,8 @@ struct Schedule: Equatable, Sendable {
         type == .timesPerWeek ? .week : .day
     }
 
-    /// A short human description, e.g. "Daily", "Mon, Wed, Fri", "3× / week".
+    /// A short human description, e.g. "Daily", "Workdays", "Mon, Wed, Fri",
+    /// "3× / week".
     func summary(calendar: Calendar = .current) -> String {
         switch type {
         case .daily:
@@ -64,6 +67,7 @@ struct Schedule: Equatable, Sendable {
         case .specificDays:
             if weekdays.isEmpty { return "No days" }
             if weekdays.count == 7 { return "Daily" }
+            if weekdays == Weekday.workdays { return "Workdays" }
             let ordered = Weekday.ordered(firstWeekday: calendar.firstWeekday)
                 .filter { weekdays.contains($0) }
             return ordered.map { $0.shortSymbol(calendar: calendar) }.joined(separator: ", ")

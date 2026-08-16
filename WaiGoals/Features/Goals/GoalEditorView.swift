@@ -21,12 +21,12 @@ struct GoalEditorView: View {
 
     init(goal: Goal? = nil) {
         self.editingGoal = goal
-        let schedule = goal?.schedule ?? .daily
+        let schedule = goal?.schedule ?? .workdays
         _title = State(initialValue: goal?.title ?? "")
         _symbol = State(initialValue: goal?.symbol ?? "target")
         _accent = State(initialValue: goal?.accent ?? .default)
         _scheduleType = State(initialValue: schedule.type)
-        _weekdays = State(initialValue: schedule.weekdays.isEmpty ? [.monday, .wednesday, .friday] : schedule.weekdays)
+        _weekdays = State(initialValue: schedule.weekdays.isEmpty ? Weekday.workdays : schedule.weekdays)
         _timesPerWeek = State(initialValue: schedule.type == .timesPerWeek ? schedule.timesPerWeek : 3)
         _reminderEnabled = State(initialValue: goal?.reminderEnabled ?? false)
         _reminderTime = State(initialValue: goal?.reminderTime ?? GoalEditorView.defaultReminderTime)

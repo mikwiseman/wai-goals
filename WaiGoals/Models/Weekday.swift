@@ -9,6 +9,9 @@ enum Weekday: Int, CaseIterable, Identifiable, Codable, Sendable, Comparable {
 
     static func < (lhs: Weekday, rhs: Weekday) -> Bool { lhs.rawValue < rhs.rawValue }
 
+    /// Workdays: every day except Saturday. The default schedule for new goals.
+    static let workdays: Set<Weekday> = Set(allCases.filter { $0 != .saturday })
+
     /// The weekday for a given date in the supplied calendar.
     static func from(_ date: Date, calendar: Calendar = .current) -> Weekday {
         Weekday(rawValue: calendar.component(.weekday, from: date)) ?? .sunday

@@ -37,10 +37,23 @@ struct ScheduleTests {
         #expect(Schedule(type: .timesPerWeek, timesPerWeek: 99).timesPerWeek == 7)
     }
 
+    @Test("Workdays is scheduled every day except Saturday")
+    func workdays() {
+        let s = Schedule.workdays
+        // Jan 13 2025 = Mon, 17 = Fri, 18 = Sat, 19 = Sun.
+        #expect(s.type == .specificDays)
+        #expect(s.isScheduled(on: Cal.day(2025, 1, 13, in: cal), calendar: cal))   // Mon
+        #expect(s.isScheduled(on: Cal.day(2025, 1, 17, in: cal), calendar: cal))   // Fri
+        #expect(!s.isScheduled(on: Cal.day(2025, 1, 18, in: cal), calendar: cal))  // Sat
+        #expect(s.isScheduled(on: Cal.day(2025, 1, 19, in: cal), calendar: cal))   // Sun
+        #expect(s.streakUnit == .day)
+    }
+
     @Test("Summaries read naturally")
     func summaries() {
         #expect(Schedule.daily.summary(calendar: cal) == "Daily")
         #expect(Schedule(type: .timesPerWeek, timesPerWeek: 3).summary(calendar: cal) == "3× / week")
         #expect(Schedule(type: .specificDays, weekdays: Set(Weekday.allCases)).summary(calendar: cal) == "Daily")
+        #expect(Schedule.workdays.summary(calendar: cal) == "Workdays")
     }
 }
