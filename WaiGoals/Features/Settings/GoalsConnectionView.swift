@@ -9,9 +9,9 @@ struct GoalsConnectionView: View {
     var body: some View {
         Form {
             Section {
-                Text("Let your goals meet your time and money.")
+                Text("Your goals. Your space.")
                     .font(.title3.weight(.semibold))
-                Text("Connect your WaiMoney account to make your goals available to your personal agent, including Dots. Your phone sends an updated snapshot when you open WaiGoals or change a goal.")
+                Text("Sign in with your personal WaiMoney account. Your goals, time and money stay connected. Access is reserved for the owner.")
                     .font(.subheadline).foregroundStyle(.secondary)
             }
             if connection.isConnected {
@@ -23,7 +23,7 @@ struct GoalsConnectionView: View {
                         Text("Waiting for the first sync").foregroundStyle(.secondary)
                     }
                     Button("Sync now") { Task { await connection.sync(goals: context.allGoals()) } }
-                    Button("Disconnect", role: .destructive) { Task { await connection.disconnect() } }
+                    Button("Sign out", role: .destructive) { Task { await connection.disconnect() } }
                         .disabled(connection.busy)
                 } footer: {
                     Text("Dots also needs access to your WaiMoney connection. This screen confirms data sync, not whether Dots has been connected. Disconnect removes this device’s snapshot from WaiMoney.")
@@ -38,18 +38,18 @@ struct GoalsConnectionView: View {
                             if connection.isConnected { password = "" }
                         }
                     } label: {
-                        if connection.busy { ProgressView() } else { Text("Connect my goals") }
+                        if connection.busy { ProgressView() } else { Text("Sign in") }
                     }
                     .disabled(connection.busy || email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || password.isEmpty)
                 } header: { Text("Sign in to WaiMoney") } footer: {
-                    Text("Optional. Shares goal names, your reasons, small steps, schedules and the last 90 days of intentions and completions with your WaiMoney account. Your password is never saved. Goals still work offline.")
+                    Text("After signing in, your goals also work offline. Your password is never saved.")
                 }
             }
             if let status = connection.status {
                 Section { Text(status).foregroundStyle(.secondary).accessibilityIdentifier("goals.connection.status") }
             }
         }
-        .navigationTitle("Connect your goals")
+        .navigationTitle("WaiGoals")
         .navigationBarTitleDisplayMode(.inline)
     }
 }

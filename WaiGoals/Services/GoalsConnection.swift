@@ -96,7 +96,7 @@ final class GoalsConnection {
         let(data,response)=try await session.data(for:request)
         guard let http=response as? HTTPURLResponse else { throw URLError(.badServerResponse) }
         guard (200..<300).contains(http.statusCode) else {
-            if http.statusCode==401 { throw ConnectionError.unauthorized }
+            if http.statusCode==401 || http.statusCode==403 { throw ConnectionError.unauthorized }
             throw ConnectionError.message("Connection unavailable (\(http.statusCode)). Your goals are safe on this device.")
         }
         return data

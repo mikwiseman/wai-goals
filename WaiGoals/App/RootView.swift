@@ -8,10 +8,23 @@ struct RootView: View {
     @Environment(\.dynamicTypeSize) private var preferredDynamicTypeSize
     @State private var scheduler = NotificationScheduler()
     @State private var coordinator = NotificationCoordinator()
+    @State private var connection = GoalsConnection.shared
     @State private var didBootstrap = false
     @State private var selection: AppTab = AppLaunch.initialTab
 
     var body: some View {
+        Group {
+            if connection.isConnected {
+                mainTabs
+            } else {
+                NavigationStack { GoalsConnectionView() }
+            }
+        }
+        .preferredColorScheme(Appearance(rawValue: appearanceRaw)?.colorScheme)
+        .task { await connection.sync(goals: context.allGoals()) }
+    }
+
+    private var mainTabs: some View {
         TabView(selection: $selection) {
             Tab("Today", systemImage: "checklist", value: AppTab.today) {
                 TodayView()
