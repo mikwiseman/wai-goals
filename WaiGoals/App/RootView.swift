@@ -21,7 +21,7 @@ struct RootView: View {
             }
         }
         .preferredColorScheme(Appearance(rawValue: appearanceRaw)?.colorScheme)
-        .task { await connection.sync(goals: context.allGoals()) }
+        .task { await connection.sync(goals: context.allGoals(), journal: context.allJournalEntries()) }
     }
 
     private var mainTabs: some View {
@@ -29,6 +29,9 @@ struct RootView: View {
             Tab("Today", systemImage: "checklist", value: AppTab.today) {
                 TodayView()
                     .environment(\.dynamicTypeSize, preferredDynamicTypeSize)
+            }
+            Tab("Разговор", systemImage: "bubble.left.and.text.bubble.right", value: AppTab.journal) {
+                GoalsConversationView().environment(\.dynamicTypeSize, preferredDynamicTypeSize)
             }
             Tab("Goals", systemImage: "square.stack.3d.up.fill", value: AppTab.goals) {
                 GoalsListView()
@@ -51,10 +54,10 @@ struct RootView: View {
             if id != nil { selection = .today }
         }
         .onReceive(NotificationCenter.default.publisher(for: .goalsDidSave)) { _ in
-            Task { await GoalsConnection.shared.sync(goals: context.allGoals()) }
+            Task { await GoalsConnection.shared.sync(goals: context.allGoals(), journal: context.allJournalEntries()) }
         }
         .onChange(of: scenePhase) { _, phase in
-            if phase == .active { Task { await GoalsConnection.shared.sync(goals: context.allGoals()) } }
+            if phase == .active { Task { await GoalsConnection.shared.sync(goals: context.allGoals(), journal: context.allJournalEntries()) } }
         }
         .task {
             guard !didBootstrap else { return }
@@ -66,7 +69,7 @@ struct RootView: View {
             AchievementUnlockStore.reconcile(goals: context.allGoals(), context: context)
             await scheduler.refreshAuthorizationStatus()
             scheduler.reschedule(for: context.allGoals())
-            await GoalsConnection.shared.sync(goals: context.allGoals())
+            await GoalsConnection.shared.sync(goals: context.allGoals(), journal: context.allJournalEntries())
         }
     }
 }

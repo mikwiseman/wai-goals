@@ -19,12 +19,14 @@ struct GoalsConnectionView: View {
             if connection.isConnected {
                 Section {
                     Label("Connected to WaiMoney", systemImage: "checkmark.circle")
+                    LabeledContent("Codex", value: "GPT‑6.1 Sol · Fast")
+                    Text("Подписка ChatGPT используется для разбора записей. Распознавание аудио — через OpenAI API.").font(.footnote).foregroundStyle(.secondary)
                     if let date = connection.lastSyncedAt {
                         LabeledContent("Last synced", value: date.formatted(date: .abbreviated, time: .shortened))
                     } else {
                         Text("Waiting for the first sync").foregroundStyle(.secondary)
                     }
-                    Button("Sync now") { Task { await connection.sync(goals: context.allGoals()) } }
+                    Button("Sync now") { Task { await connection.sync(goals: context.allGoals(), journal: context.allJournalEntries()) } }
                     Button("Sign out", role: .destructive) { Task { await connection.disconnect() } }
                         .disabled(connection.busy)
                 } footer: {
@@ -36,7 +38,7 @@ struct GoalsConnectionView: View {
                     SecureField("Password", text: $password).textContentType(.password)
                     Button {
                         Task {
-                            await connection.connect(email: email, password: password, goals: context.allGoals())
+                            await connection.connect(email: email, password: password, goals: context.allGoals(), journal: context.allJournalEntries())
                             if connection.isConnected { password = "" }
                         }
                     } label: {

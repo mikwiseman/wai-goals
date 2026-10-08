@@ -30,6 +30,11 @@ extension ModelContext {
         }
     }
 
+    func allJournalEntries() -> [JournalEntry] {
+        do { return try fetch(FetchDescriptor<JournalEntry>()) }
+        catch { assertionFailure("Journal fetch failed"); return [] }
+    }
+
     func allAchievementUnlocks(_ function: StaticString = #function) -> [AchievementUnlock] {
         do {
             return try fetch(FetchDescriptor<AchievementUnlock>())

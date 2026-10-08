@@ -22,7 +22,7 @@ final class GoalsConnection {
             credential = try? JSONDecoder().decode(Credential.self,from:data)
         }
     }
-    func connect(email: String, password: String, goals: [Goal]) async {
+    func connect(email: String, password: String, goals: [Goal], journal: [JournalEntry] = []) async {
         guard !busy, !isConnected else { return }
         busy=true; status=nil
         defer { busy=false }
@@ -43,12 +43,12 @@ final class GoalsConnection {
             }
             credential=value
             UserDefaults.standard.set(deviceId.uuidString, forKey: "goals.deviceId")
-            await sync(goals:goals)
+            await sync(goals:goals, journal:journal)
         } catch { status=error.localizedDescription }
     }
-    func sync(goals: [Goal]) async {
+    func sync(goals: [Goal], journal: [JournalEntry] = []) async {
         guard let connection=credential else { return }
-        do { pending=try GoalsSnapshot.make(goals:goals,deviceId:connection.deviceId) }
+        do { pending=try GoalsSnapshot.make(goals:goals,deviceId:connection.deviceId, journal:journal) }
         catch { status="Could not prepare your goals for syncing.";return }
         guard !syncing else { return }
         syncing=true
@@ -80,16 +80,52 @@ final class GoalsConnection {
             status="Connection expired. Sign in again to manage the saved snapshot."
         } catch { status=error.localizedDescription }
     }
+    func reflect(entry: JournalEntry) async throws -> String {
+        guard let credential else { throw ConnectionError.unauthorized }
+        let body = try JSONSerialization.data(withJSONObject: ["kind":entry.kindRaw, "period":entry.periodKey, "text":entry.text, "timezone":TimeZone.current.identifier])
+        let data = try await request(path:"/api/goals/reflect", method:"POST", token:credential.token, body:body, timeout:150)
+        guard let object = try JSONSerialization.jsonObject(with:data) as? [String:Any],
+              let insight = object["insight"] as? String, !insight.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty else {
+            throw ConnectionError.message("Разбор не завершён. Запись сохранена — можно попробовать снова.")
+        }
+        return insight
+    }
+    func transcribe(audio: Data) async throws -> String {
+        guard let credential else { throw ConnectionError.unauthorized }
+        let boundary = UUID().uuidString
+        var body = Data("--\(boundary)\r\nContent-Disposition: form-data; name=\"audio\"; filename=\"recording.m4a\"\r\nContent-Type: audio/m4a\r\n\r\n".utf8)
+        body.append(audio)
+        body.append(Data("\r\n--\(boundary)--\r\n".utf8))
+        let data = try await request(path:"/api/goals/transcribe", method:"POST", token:credential.token, body:body, contentType:"multipart/form-data; boundary=\(boundary)", timeout:90)
+        guard let object = try JSONSerialization.jsonObject(with:data) as? [String:Any], let text = object["text"] as? String, !text.isEmpty else {
+            throw ConnectionError.message("Не удалось услышать речь. Запись можно распознать ещё раз.")
+        }
+        return text
+    }
+    struct ConversationReply: Decodable {
+        struct Journal: Decodable { var kind: JournalKind; var period: String; var text: String }
+        var reply: String
+        var journal: Journal?
+    }
+    func message(_ command: ConversationPending) async throws -> ConversationReply {
+        guard let credential else { throw ConnectionError.unauthorized }
+        return try JSONDecoder().decode(ConversationReply.self, from: await request(path: "/api/goals/message", method: "POST", token: credential.token, body: command.body, timeout: 150, requestId: command.id))
+    }
+    func speech(_ text: String) async throws -> Data {
+        guard let credential else { throw ConnectionError.unauthorized }
+        return try await request(path: "/api/goals/speech", method: "POST", token: credential.token, body: JSONSerialization.data(withJSONObject: ["text": text]), timeout: 90)
+    }
     private func clearCredential() {
         if let credential { UserDefaults.standard.set(credential.deviceId.uuidString, forKey: "goals.deviceId") }
         SecItemDelete([kSecClass as String:kSecClassGenericPassword,kSecAttrService as String:service] as CFDictionary)
         credential=nil;pending=nil;lastSyncedAt=nil
         UserDefaults.standard.removeObject(forKey:"goals.lastSyncedAt")
     }
-    private func request(path:String,method:String,token:String?=nil,body:Data?=nil) async throws -> Data {
+    private func request(path:String,method:String,token:String?=nil,body:Data?=nil, contentType:String="application/json", timeout:TimeInterval=30, requestId:UUID?=nil) async throws -> Data {
         var request=URLRequest(url:URL(string:origin+path)!)
-        request.httpMethod=method;request.httpBody=body;request.timeoutInterval=30
-        request.setValue("application/json",forHTTPHeaderField:"Content-Type")
+        request.httpMethod=method;request.httpBody=body;request.timeoutInterval=timeout
+        request.setValue(contentType,forHTTPHeaderField:"Content-Type")
+        if let requestId { request.setValue(requestId.uuidString, forHTTPHeaderField:"Idempotency-Key") }
         if let token { request.setValue("Bearer \(token)",forHTTPHeaderField:"Authorization") }
         let session=URLSession(configuration:.ephemeral)
         defer{session.finishTasksAndInvalidate()}
@@ -97,6 +133,9 @@ final class GoalsConnection {
         guard let http=response as? HTTPURLResponse else { throw URLError(.badServerResponse) }
         guard (200..<300).contains(http.statusCode) else {
             if http.statusCode==401 || http.statusCode==403 { throw ConnectionError.unauthorized }
+            if let object = try? JSONSerialization.jsonObject(with:data) as? [String:Any], let message = object["error"] as? String, http.statusCode < 500 {
+                throw ConnectionError.message(String(message.prefix(300)))
+            }
             throw ConnectionError.message("Connection unavailable (\(http.statusCode)). Your goals are safe on this device.")
         }
         return data

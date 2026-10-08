@@ -2,7 +2,7 @@ import Foundation
 
 @MainActor
 enum GoalsSnapshot {
-    static func make(goals: [Goal], deviceId: UUID, now: Date = .now, calendar: Calendar = .current) throws -> Data {
+    static func make(goals: [Goal], deviceId: UUID, journal: [JournalEntry] = [], now: Date = .now, calendar: Calendar = .current) throws -> Data {
         let formatter = DateFormatter()
         formatter.calendar = Calendar(identifier: .gregorian)
         formatter.locale = Locale(identifier: "en_US_POSIX")
@@ -21,6 +21,13 @@ enum GoalsSnapshot {
              "archived": goal.isArchived, "schedule": goal.schedule.summary(calendar: calendar),
              "completedDays": days(goal.completions.map(\.day)), "intendedDays": days(goal.intentions.map(\.day))]
         }
-        return try JSONSerialization.data(withJSONObject: ["deviceId":deviceId.uuidString, "capturedAt":timestamp.string(from:now), "timezone":calendar.timeZone.identifier, "historyStart":formatter.string(from:cutoff), "goals":records], options:[.sortedKeys])
+        let journalRecords: [[String: Any]] = journal
+            .filter { $0.periodKey >= formatter.string(from: cutoff) }
+            .sorted { $0.updatedAt > $1.updatedAt }.prefix(240).map { entry in
+                ["id": entry.id.uuidString, "kind": entry.kindRaw, "period": entry.periodKey,
+                 "text": entry.text, "insight": entry.insight as Any? ?? NSNull(),
+                 "updatedAt": timestamp.string(from: entry.updatedAt)]
+            }
+        return try JSONSerialization.data(withJSONObject: ["deviceId":deviceId.uuidString, "capturedAt":timestamp.string(from:now), "timezone":calendar.timeZone.identifier, "historyStart":formatter.string(from:cutoff), "goals":records, "journal":journalRecords], options:[.sortedKeys])
     }
 }
