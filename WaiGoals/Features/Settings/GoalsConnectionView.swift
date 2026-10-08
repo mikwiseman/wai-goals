@@ -11,7 +11,9 @@ struct GoalsConnectionView: View {
             Section {
                 Text("Your goals. Your space.")
                     .font(.title3.weight(.semibold))
-                Text("Sign in with your personal WaiMoney account. Your goals, time and money stay connected. Access is reserved for the owner.")
+                Text(connection.isConnected
+                     ? "Your goals, time and money stay connected in your personal account."
+                     : "Sign in with your personal WaiMoney account. Access is reserved for the owner.")
                     .font(.subheadline).foregroundStyle(.secondary)
             }
             if connection.isConnected {
@@ -26,7 +28,7 @@ struct GoalsConnectionView: View {
                     Button("Sign out", role: .destructive) { Task { await connection.disconnect() } }
                         .disabled(connection.busy)
                 } footer: {
-                    Text("Dots also needs access to your WaiMoney connection. This screen confirms data sync, not whether Dots has been connected. Disconnect removes this device’s snapshot from WaiMoney.")
+                    Text("Signing out removes this device’s synced copy from WaiMoney. Your goals stay on this device. Dots access is managed in Dots.")
                 }
             } else {
                 Section {
