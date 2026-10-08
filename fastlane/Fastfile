@@ -72,3 +72,70 @@ platform :ios do
     )
   end
 end
+
+require "fileutils"
+require "fastlane_core/provisioning_profile"
+require "xcodeproj"
+
+# Only the app Release target uses the distribution profile. Restore the
+# generated project even when archive/export fails, so simulator tests stay usable.
+def with_release_signing(project_path, app_name, profile_name)
+  file = File.join(project_path, "project.pbxproj")
+  original = File.binread(file)
+  project = Xcodeproj::Project.open(project_path)
+  target = project.targets.find { |item| item.name == app_name }
+  UI.user_error!("Missing app target #{app_name}") unless target
+  configuration = target.build_configurations.find { |item| item.name == "Release" }
+  configuration.build_settings.merge!(
+    "CODE_SIGN_STYLE" => "Manual",
+    "CODE_SIGN_IDENTITY" => "Apple Distribution",
+    "DEVELOPMENT_TEAM" => "R4A779QVVY",
+    "PROVISIONING_PROFILE_SPECIFIER" => profile_name
+  )
+  project.save
+  yield
+ensure
+  File.binwrite(file, original) if original
+end
+
+platform :ios do
+  desc "Archive the current project.yml version; optionally upload to TestFlight"
+  lane :release_testflight do |options|
+    root = File.expand_path("..", __dir__)
+    app_name = "WaiGoals"
+    bundle_id = "is.waiwai.goals"
+    api_key = asc_api_key
+    sh("xcodegen", "generate", "--spec", File.join(root, "project.yml"))
+    project_path = File.join(root, "#{app_name}.xcodeproj")
+    profiles = File.join(root, "build", "profiles")
+    FileUtils.mkdir_p(profiles)
+    get_provisioning_profile(
+      api_key: api_key, app_identifier: bundle_id,
+      cert_owner_name: "WaiWai, LLC", provisioning_name: "#{app_name} AppStore",
+      output_path: profiles, filename: "#{app_name}_AppStore.mobileprovision",
+      skip_install: true
+    )
+    profile_path = lane_context[SharedValues::SIGH_PROFILE_PATH]
+    UI.user_error!("No distribution profile downloaded") unless profile_path && File.exist?(profile_path)
+    profile = FastlaneCore::ProvisioningProfile.parse(profile_path)
+    installed = File.expand_path("~/Library/MobileDevice/Provisioning Profiles")
+    FileUtils.mkdir_p(installed)
+    FileUtils.cp(profile_path, File.join(installed, "#{profile.fetch('UUID')}.mobileprovision"))
+    with_release_signing(project_path, app_name, profile.fetch("Name")) do
+      build_app(
+        project: project_path, scheme: app_name, configuration: "Release", clean: true,
+        derived_data_path: File.expand_path("~/Library/Caches/WaiSuiteBuilds/Goals"),
+        export_method: "app-store", xcargs: "COMPILER_INDEX_STORE_ENABLE=NO",
+        export_options: { method: "app-store", signingStyle: "manual", teamID: "R4A779QVVY",
+          signingCertificate: "Apple Distribution", provisioningProfiles: { bundle_id => profile.fetch("Name") } },
+        output_directory: File.join(root, "build", "export"), output_name: "#{app_name}.ipa"
+      )
+    end
+    unless %w[1 true yes].include?(options[:skip_upload].to_s)
+      upload_to_testflight(api_key: api_key, app_identifier: bundle_id,
+        ipa: File.join(root, "build", "export", "#{app_name}.ipa"),
+        skip_waiting_for_build_processing: true, skip_submission: true,
+        changelog: options[:changelog])
+    end
+  end
+end
