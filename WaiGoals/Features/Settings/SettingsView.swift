@@ -22,6 +22,12 @@ struct SettingsView: View {
                     .pickerStyle(.segmented)
                 }
 
+                Section("Connections") {
+                    NavigationLink { GoalsConnectionView() } label: {
+                        Label("Connect your goals", systemImage: "point.3.connected.trianglepath.dotted")
+                    }
+                }
+
                 Section("Notifications") {
                     notificationsRow
                 }
@@ -31,7 +37,7 @@ struct SettingsView: View {
                 } header: {
                     Text("About")
                 } footer: {
-                    Text("WaiGoals keeps everything on your device. No account, no cloud, no tracking — just your goals.")
+                    Text("Your goals stay on your device. Connecting to WaiMoney is optional and shares only the goal snapshot described in Connections.")
                 }
 
                 #if DEBUG

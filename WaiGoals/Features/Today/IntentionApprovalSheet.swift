@@ -61,7 +61,10 @@ struct IntentionApprovalSheet: View {
             Text("Today’s deliberate step")
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(.secondary)
-            Text(Intention.pledgeText)
+            if let why = goal.personalWhy {
+                Text(why).font(.subheadline).foregroundStyle(.secondary)
+            }
+            Text(goal.smallStep == nil ? Intention.pledgeText : goal.nextStepText)
                 .font(.title3.weight(.semibold))
                 .fixedSize(horizontal: false, vertical: true)
         }

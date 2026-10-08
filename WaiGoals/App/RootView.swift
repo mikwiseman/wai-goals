@@ -3,6 +3,7 @@ import SwiftData
 
 struct RootView: View {
     @AppStorage(AppStorageKey.appearance) private var appearanceRaw = Appearance.system.rawValue
+    @Environment(\.scenePhase) private var scenePhase
     @Environment(\.modelContext) private var context
     @Environment(\.dynamicTypeSize) private var preferredDynamicTypeSize
     @State private var scheduler = NotificationScheduler()
@@ -36,6 +37,12 @@ struct RootView: View {
         .onChange(of: coordinator.routeGoalID) { _, id in
             if id != nil { selection = .today }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .goalsDidSave)) { _ in
+            Task { await GoalsConnection.shared.sync(goals: context.allGoals()) }
+        }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { Task { await GoalsConnection.shared.sync(goals: context.allGoals()) } }
+        }
         .task {
             guard !didBootstrap else { return }
             didBootstrap = true
@@ -46,6 +53,7 @@ struct RootView: View {
             AchievementUnlockStore.reconcile(goals: context.allGoals(), context: context)
             await scheduler.refreshAuthorizationStatus()
             scheduler.reschedule(for: context.allGoals())
+            await GoalsConnection.shared.sync(goals: context.allGoals())
         }
     }
 }

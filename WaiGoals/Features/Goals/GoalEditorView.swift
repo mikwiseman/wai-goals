@@ -10,6 +10,8 @@ struct GoalEditorView: View {
     private let editingGoal: Goal?
 
     @State private var title: String
+    @State private var personalWhy: String
+    @State private var smallStep: String
     @State private var symbol: String
     @State private var accent: AccentToken
     @State private var scheduleType: ScheduleType
@@ -23,6 +25,8 @@ struct GoalEditorView: View {
         self.editingGoal = goal
         let schedule = goal?.schedule ?? .workdays
         _title = State(initialValue: goal?.title ?? "")
+        _personalWhy = State(initialValue: goal?.personalWhy ?? "")
+        _smallStep = State(initialValue: goal?.smallStep ?? "")
         _symbol = State(initialValue: goal?.symbol ?? "target")
         _accent = State(initialValue: goal?.accent ?? .default)
         _scheduleType = State(initialValue: schedule.type)
@@ -41,6 +45,14 @@ struct GoalEditorView: View {
             Form {
                 previewSection
                 detailsSection
+                Section {
+                    TextField("Why this matters to me", text: $personalWhy, axis: .vertical)
+                        .lineLimit(2...4)
+                    TextField("A small step, even on a hard day", text: $smallStep, axis: .vertical)
+                        .lineLimit(1...3)
+                } header: { Text("Make it yours") } footer: {
+                    Text("Optional. Your own reason and one easy place to start.")
+                }
                 scheduleSection
                 reminderSection
             }
@@ -185,7 +197,7 @@ struct GoalEditorView: View {
     // MARK: - Logic
 
     private var canSave: Bool {
-        !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+        !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && title.count <= 200 && personalWhy.count <= 1000 && smallStep.count <= 500 &&
         (scheduleType != .specificDays || !weekdays.isEmpty)
     }
 
@@ -202,6 +214,8 @@ struct GoalEditorView: View {
         let time = reminderEnabled ? reminderTime : nil
 
         if let goal = editingGoal {
+            goal.personalWhy = personalWhy.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+            goal.smallStep = smallStep.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
             goal.title = trimmed
             goal.symbol = symbol
             goal.colorToken = accent.rawValue
@@ -212,6 +226,8 @@ struct GoalEditorView: View {
             let nextIndex = (allGoals.map(\.sortIndex).max() ?? -1) + 1
             let goal = Goal(title: trimmed, symbol: symbol, color: accent, schedule: schedule,
                             reminderEnabled: reminderEnabled, reminderTime: time, sortIndex: nextIndex)
+            goal.personalWhy = personalWhy.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+            goal.smallStep = smallStep.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
             context.insert(goal)
         }
         context.saveOrLog()
@@ -222,4 +238,8 @@ struct GoalEditorView: View {
         }
         dismiss()
     }
+}
+
+private extension String {
+    var nilIfEmpty: String? { isEmpty ? nil : self }
 }

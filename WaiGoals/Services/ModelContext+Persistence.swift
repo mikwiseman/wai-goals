@@ -11,6 +11,7 @@ extension ModelContext {
         guard hasChanges else { return }
         do {
             try save()
+            NotificationCenter.default.post(name: .goalsDidSave, object: nil)
         } catch {
             persistenceLog.error("SwiftData save failed in \(String(describing: function), privacy: .public): \(error, privacy: .public)")
             assertionFailure("SwiftData save failed: \(error)")
@@ -39,3 +40,5 @@ extension ModelContext {
         }
     }
 }
+
+extension Notification.Name { static let goalsDidSave = Notification.Name("goals.didSave") }

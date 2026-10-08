@@ -8,6 +8,8 @@ import SwiftData
 final class Goal {
     var id: UUID = UUID()
     var title: String = ""
+    var personalWhy: String?
+    var smallStep: String?
     /// SF Symbol name shown as the goal's icon.
     var symbol: String = "target"
     /// `AccentToken.rawValue`.
@@ -84,6 +86,11 @@ extension Goal {
             scheduledWeekdaysRaw = newValue.weekdays.map(\.rawValue).sorted()
             weeklyTarget = newValue.timesPerWeek
         }
+    }
+
+    var nextStepText: String {
+        let step = smallStep?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return step.isEmpty ? title : step
     }
 
     var accent: AccentToken { AccentToken(rawValue: colorToken) ?? .default }

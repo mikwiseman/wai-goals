@@ -32,6 +32,21 @@ struct GoalDetailView: View {
                         markTodayButton(tint: tint)
                         intentionCard(tint: tint)
                     }
+                    if goal.personalWhy != nil || goal.smallStep != nil {
+                        VStack(alignment: .leading, spacing: Theme.Spacing.s) {
+                            if let why = goal.personalWhy {
+                                Text("Why it matters").font(.caption).foregroundStyle(.secondary)
+                                Text(why).font(.body)
+                            }
+                            if let step = goal.smallStep {
+                                Text("My small step").font(.caption).foregroundStyle(.secondary)
+                                Text(step).font(.headline)
+                            }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(Theme.Spacing.l)
+                        .card()
+                    }
                     streakCard(streak: streak, tint: tint)
                     weekCard(completed: completed, tint: tint)
                     heatmapCard(completed: completed, tint: tint)
@@ -135,7 +150,7 @@ struct GoalDetailView: View {
                     Text(intention == nil ? "Approve intention" : "Intention approved")
                         .font(.headline)
                         .foregroundStyle(.primary)
-                    Text(Intention.pledgeText)
+                    Text(goal.smallStep?.isEmpty == false ? goal.nextStepText : Intention.pledgeText)
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.leading)
