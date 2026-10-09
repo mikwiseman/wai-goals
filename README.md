@@ -24,7 +24,7 @@ A minimal, native iOS app for tracking the goals and habits that matter — *“
 - **Statistics** — a per-week completion ring, a GitHub-style **heatmap**, a 12-week **trend chart** (Swift Charts), completion rate, and a current-streak leaderboard.
 - **Impossible artifacts** — eight Escher-inspired achievements for a first step, kept intentions, returning after a miss, meaningful streaks, 100 real actions, and exploring every emotional world.
 - **Per-goal reminders** — local notifications at a time you choose; tapping one opens that goal.
-- **Local storage and optional sync** — goals and journal entries live on device via SwiftData. Create an account or sign in directly in Goals to sync a private snapshot. Money and Goals currently share the account service; installing Money is not required. AI and voice require a connected personal assistant and are not included with a new registration.
+- **Local storage and optional sync** — goals and journal entries live on device via SwiftData. Create an account or sign in directly in Goals to sync a private snapshot. Goals has independent accounts, passwords, sessions and MCP keys. The service is hosted on the existing Money server under /api/goals, with separate database tables and signing secret. Existing device connections remain compatible until the user chooses to migrate. AI and voice require a connected personal assistant and are not included with a new registration.
 - **Polished by default** — full Dark Mode, Dynamic Type, VoiceOver labels, Reduce Motion / Reduce Transparency support, and 44pt touch targets throughout.
 
 ## Design

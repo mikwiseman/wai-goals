@@ -37,7 +37,7 @@ struct SettingsView: View {
                 } header: {
                     Text("About")
                 } footer: {
-                    Text("Your personal space. Goals stay on this device and sync with your WaiMoney account for insights alongside your time and money.")
+                    Text("Your personal space. Goals stay on this device and can sync to your independent Goals account. Connect MCP to explore them alongside your time and money.")
                 }
 
                 #if DEBUG
