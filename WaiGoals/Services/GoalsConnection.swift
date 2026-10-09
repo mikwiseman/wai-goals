@@ -5,7 +5,7 @@ import Security
 @MainActor @Observable
 final class GoalsConnection {
     static let shared = GoalsConnection()
-    private struct Credential: Codable { let token: String; let deviceId: UUID }
+    private struct Credential: Codable { let token: String; let deviceId: UUID; var userId: String? }
     private let service = "is.waiwai.goals.connection"
     private let origin = "https://money.waiwai.is"
     private var credential: Credential?
@@ -13,6 +13,7 @@ final class GoalsConnection {
     private var syncing = false
     var busy = false
     var status: String?
+    var aiAvailable: Bool?
     var lastSyncedAt: Date? = UserDefaults.standard.object(forKey: "goals.lastSyncedAt") as? Date
     var isConnected: Bool { credential != nil }
     private init() {
@@ -22,17 +23,31 @@ final class GoalsConnection {
             credential = try? JSONDecoder().decode(Credential.self,from:data)
         }
     }
-    func connect(email: String, password: String, goals: [Goal], journal: [JournalEntry] = []) async {
+    func connect(email: String, password: String, name: String? = nil, goals: [Goal], journal: [JournalEntry] = []) async {
         guard !busy, !isConnected else { return }
         busy=true; status=nil
         defer { busy=false }
         do {
-            let login=try await request(path:"/api/auth/sign-in/email",method:"POST",body:JSONSerialization.data(withJSONObject:["email":email.trimmingCharacters(in:.whitespacesAndNewlines).lowercased(),"password":password]))
-            guard let object=try JSONSerialization.jsonObject(with:login) as? [String:Any],let session=object["token"] as? String else { throw ConnectionError.message("Could not sign in. Check your WaiMoney account.") }
+            let normalizedEmail=email.trimmingCharacters(in:.whitespacesAndNewlines).lowercased()
+            var fields=["email":normalizedEmail,"password":password]
+            if let name { fields["name"]=name.trimmingCharacters(in:.whitespacesAndNewlines) }
+            let path=name == nil ? "/api/auth/sign-in/email" : "/api/auth/sign-up/email"
+            let login=try await request(path:path,method:"POST",body:JSONSerialization.data(withJSONObject:fields))
+            guard let object=try JSONSerialization.jsonObject(with:login) as? [String:Any],
+                  let session=object["token"] as? String,
+                  let user=object["user"] as? [String:Any],let userId=user["id"] as? String else {
+                throw ConnectionError.message("Could not sign in. Please try again.")
+            }
+            if let boundId=UserDefaults.standard.string(forKey:"goals.boundAccountId"),boundId != userId {
+                _ = try? await request(path:"/api/auth/sign-out",method:"POST",token:session,body:Data("{}".utf8))
+                throw ConnectionError.message("The goals on this device belong to another account. Sign in to that account to keep your data separate.")
+            }
             let data=try await request(path:"/api/goals/connection",method:"POST",token:session)
+            // Only the scoped Goals token is kept on the device.
+            _ = try? await request(path:"/api/auth/sign-out",method:"POST",token:session,body:Data("{}".utf8))
             guard let object=try JSONSerialization.jsonObject(with:data) as? [String:Any],let token=object["token"] as? String else { throw ConnectionError.message("Could not connect. Please try again.") }
             let deviceId = UserDefaults.standard.string(forKey: "goals.deviceId").flatMap(UUID.init(uuidString:)) ?? UUID()
-            let value=Credential(token:token,deviceId:deviceId)
+            let value=Credential(token:token,deviceId:deviceId,userId:userId)
             let stored=try JSONEncoder().encode(value)
             let query:[String:Any]=[kSecClass as String:kSecClassGenericPassword,kSecAttrService as String:service]
             SecItemDelete(query as CFDictionary)
@@ -42,12 +57,25 @@ final class GoalsConnection {
                 throw ConnectionError.message("Could not save the connection securely.")
             }
             credential=value
+            aiAvailable=object["aiAvailable"] as? Bool
+            UserDefaults.standard.set(userId,forKey:"goals.boundAccountId")
             UserDefaults.standard.set(deviceId.uuidString, forKey: "goals.deviceId")
             await sync(goals:goals, journal:journal)
         } catch { status=error.localizedDescription }
     }
+    func refreshStatus() async {
+        guard let credential else { return }
+        do {
+            let data=try await request(path:"/api/goals/connection",method:"GET",token:credential.token)
+            guard let object=try JSONSerialization.jsonObject(with:data) as? [String:Any],let userId=object["userId"] as? String,
+                  self.credential?.token == credential.token else { return }
+            aiAvailable=object["aiAvailable"] as? Bool
+            UserDefaults.standard.set(userId,forKey:"goals.boundAccountId")
+        } catch { /* A temporary status failure must not sign out a valid session. */ }
+    }
     func sync(goals: [Goal], journal: [JournalEntry] = []) async {
         guard let connection=credential else { return }
+        if UserDefaults.standard.string(forKey:"goals.boundAccountId") == nil { await refreshStatus() }
         do { pending=try GoalsSnapshot.make(goals:goals,deviceId:connection.deviceId, journal:journal) }
         catch { status="Could not prepare your goals for syncing.";return }
         guard !syncing else { return }
@@ -72,7 +100,11 @@ final class GoalsConnection {
         guard let connection=credential,!busy,!syncing else { return }
         busy=true;defer{busy=false}
         do {
-            _ = try await request(path:"/api/goals/connection",method:"DELETE",token:connection.token,body:JSONSerialization.data(withJSONObject:["deviceId":connection.deviceId.uuidString]))
+            await refreshStatus()
+            let data = try await request(path:"/api/goals/connection",method:"DELETE",token:connection.token,body:JSONSerialization.data(withJSONObject:["deviceId":connection.deviceId.uuidString]))
+            if let object=try JSONSerialization.jsonObject(with:data) as? [String:Any],let userId=object["userId"] as? String {
+                UserDefaults.standard.set(userId,forKey:"goals.boundAccountId")
+            }
             clearCredential()
             status=nil
         } catch ConnectionError.unauthorized {
@@ -118,7 +150,7 @@ final class GoalsConnection {
     private func clearCredential() {
         if let credential { UserDefaults.standard.set(credential.deviceId.uuidString, forKey: "goals.deviceId") }
         SecItemDelete([kSecClass as String:kSecClassGenericPassword,kSecAttrService as String:service] as CFDictionary)
-        credential=nil;pending=nil;lastSyncedAt=nil
+        credential=nil;pending=nil;lastSyncedAt=nil;aiAvailable=nil
         UserDefaults.standard.removeObject(forKey:"goals.lastSyncedAt")
     }
     private func request(path:String,method:String,token:String?=nil,body:Data?=nil, contentType:String="application/json", timeout:TimeInterval=30, requestId:UUID?=nil) async throws -> Data {
@@ -132,7 +164,7 @@ final class GoalsConnection {
         let(data,response)=try await session.data(for:request)
         guard let http=response as? HTTPURLResponse else { throw URLError(.badServerResponse) }
         guard (200..<300).contains(http.statusCode) else {
-            if http.statusCode==401 || http.statusCode==403 { throw ConnectionError.unauthorized }
+            if http.statusCode==401 { throw ConnectionError.unauthorized }
             if let object = try? JSONSerialization.jsonObject(with:data) as? [String:Any], let message = object["error"] as? String, http.statusCode < 500 {
                 throw ConnectionError.message(String(message.prefix(300)))
             }
@@ -145,7 +177,7 @@ final class GoalsConnection {
         case message(String)
         var errorDescription:String? {
             switch self {
-            case .unauthorized: "Sign-in was not accepted. Check your WaiMoney email and password."
+            case .unauthorized: "Sign-in was not accepted. Check your email and password."
             case .message(let text): text
             }
         }
