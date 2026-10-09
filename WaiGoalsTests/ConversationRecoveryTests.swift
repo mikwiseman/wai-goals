@@ -16,6 +16,26 @@ import XCTest
         let completed = Conversation(name: name)
         XCTAssertNil(completed.pending); XCTAssertEqual(completed.lines.count, 2); XCTAssertTrue(completed.draft.isEmpty)
     }
+    func testPhotoDraftAndPendingImageSurviveRelaunchWithoutDuplicatingOrReplacingCommand() throws {
+        let name = "qa-photo-" + UUID().uuidString
+        let path = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent(name + ".json")
+        defer { try? FileManager.default.removeItem(at: path) }
+        let image = Data([255,216,255,0])
+        let chat = Conversation(name: name)
+        chat.photos = [image]; chat.draft = "Фото плана"; try chat.save()
+        let restored = Conversation(name: name)
+        XCTAssertEqual(restored.photos, [image]); XCTAssertTrue(restored.lines.isEmpty)
+        let first = try restored.prepare(text: restored.draft, context: "today", body: Data("first".utf8), images: restored.photos)
+        let retryChat = Conversation(name: name)
+        let retry = try retryChat.prepare(text: retryChat.draft, context: "today", body: Data("changed history".utf8), images: retryChat.photos)
+        XCTAssertEqual(first.id, retry.id); XCTAssertEqual(first.body, retry.body)
+        XCTAssertEqual(retryChat.lines.count, 1); XCTAssertEqual(retryChat.lines[0].images, [image])
+        let replaced = try retryChat.prepare(text: retryChat.draft, context: "today", body: Data("second".utf8), images: [Data([255,216,255,1])])
+        XCTAssertNotEqual(replaced.id, first.id)
+        try retryChat.complete("Прочитано")
+        XCTAssertTrue(Conversation(name: name).photos.isEmpty)
+    }
+
     func testUnreadableHistoryIsPreservedAndCannotSendANewCommand() throws {
         let name = "qa-corrupt-" + UUID().uuidString
         let path = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent(name + ".json")

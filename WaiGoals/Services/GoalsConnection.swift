@@ -29,6 +29,7 @@ final class GoalsConnection {
         let query: [String:Any] = [kSecClass as String:kSecClassGenericPassword,kSecAttrService as String:service,kSecReturnData as String:true,kSecMatchLimit as String:kSecMatchLimitOne]
         if SecItemCopyMatching(query as CFDictionary, &result) == errSecSuccess, let data=result as? Data {
             credential = try? JSONDecoder().decode(Credential.self,from:data)
+            if credential?.independent == true { aiAvailable = false }
         }
     }
     func sendCode(email: String) async -> Bool {

@@ -98,6 +98,11 @@ final class ConversationVoice: NSObject, AVAudioPlayerDelegate {
     }
 
     private func sample() {
+        if let player, phase == .speaking {
+            player.updateMeters()
+            level = max(0, min(1, Double((player.averagePower(forChannel: 0) + 55) / 50)))
+            return
+        }
         guard let recorder, phase == .listening else { return }
         recorder.updateMeters()
         elapsed = recorder.currentTime
@@ -160,9 +165,18 @@ final class ConversationVoice: NSObject, AVAudioPlayerDelegate {
             try session.setActive(true)
             let playback = try AVAudioPlayer(data: data)
             playback.delegate = self
+            playback.isMeteringEnabled = true
             player = playback
             phase = .speaking
             guard playback.play() else { throw URLError(.cannotDecodeContentData) }
+            meter?.cancel()
+            meter = Task { [weak self] in
+                while !Task.isCancelled {
+                    try? await Task.sleep(for: .milliseconds(80))
+                    guard !Task.isCancelled else { return }
+                    self?.sample()
+                }
+            }
         } catch {
             guard ticket == generation else { return }
             pause("Ответ сохранён в чате. Озвучить пока не удалось.")
@@ -173,6 +187,7 @@ final class ConversationVoice: NSObject, AVAudioPlayerDelegate {
         Task { @MainActor [weak self] in
             guard let self, phase == .speaking else { return }
             self.player = nil
+            meter?.cancel(); meter = nil; level = 0
             phase = .idle
             try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
             if live && flag { begin() }
@@ -183,7 +198,21 @@ final class ConversationVoice: NSObject, AVAudioPlayerDelegate {
     func interruptPlayback() {
         guard phase == .speaking else { return }
         player?.stop(); player = nil; phase = .idle
+        meter?.cancel(); meter = nil; level = 0
         if live { begin() }
+    }
+
+    func cancelDictation() {
+        guard !live else { return }
+        let path = UserDefaults.standard.string(forKey: draftKey)
+        suspend()
+        if let path {
+            do {
+                if FileManager.default.fileExists(atPath: path) { try FileManager.default.removeItem(atPath: path) }
+                UserDefaults.standard.removeObject(forKey: draftKey)
+                error = nil
+            } catch { self.error = "Не удалось удалить запись." }
+        }
     }
 
     func discardDraft() {
@@ -209,41 +238,5 @@ final class ConversationVoice: NSObject, AVAudioPlayerDelegate {
         phase = .idle
         level = 0
         try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
-    }
-}
-
-struct ConversationVoiceControls: View {
-    @Bindable var voice: ConversationVoice
-    var busy = false
-    var body: some View {
-        VStack(spacing: 8) {
-            HStack(spacing: 12) {
-                Button { voice.toggleLive() } label: {
-                    Label(voice.live ? "К тексту" : "Голос", systemImage: voice.live ? "keyboard" : "waveform")
-                }
-                .disabled(!voice.live && (busy || voice.phase != .idle || voice.permissionPending))
-                if !voice.status.isEmpty {
-                    Text(voice.status).font(.caption).foregroundStyle(.secondary)
-                }
-                Spacer(minLength: 0)
-                if voice.isRecording {
-                    ProgressView(value: voice.level).frame(width: 44).accessibilityLabel("Уровень микрофона")
-                }
-                if voice.phase == .speaking {
-                    Button("Перебить") { voice.interruptPlayback() }
-                }
-                if voice.hasDraft && voice.phase == .idle && !busy {
-                    Button("Распознать запись") { voice.retryDraft() }
-                    Button { voice.discardDraft() } label: { Image(systemName: "trash") }.accessibilityLabel("Удалить сохранённую запись")
-                }
-            }
-            if let error = voice.error { Text(error).font(.caption).foregroundStyle(.secondary).frame(maxWidth: .infinity, alignment: .leading) }
-        }
-        .font(.subheadline)
-        .padding(.horizontal, 16).padding(.vertical, 8)
-        .onReceive(NotificationCenter.default.publisher(for: UIApplication.willResignActiveNotification)) { _ in voice.suspend() }
-        .onReceive(NotificationCenter.default.publisher(for: AVAudioSession.interruptionNotification)) { notification in
-            if let raw = notification.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt, raw == AVAudioSession.InterruptionType.began.rawValue { voice.suspend() }
-        }
     }
 }
