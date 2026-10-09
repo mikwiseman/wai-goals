@@ -29,12 +29,13 @@ struct RootView: View {
         GoalsConversationView(onOpenWorkspace: { workspaceShown = true })
             .environment(\.dynamicTypeSize, preferredDynamicTypeSize)
             .sheet(isPresented: $workspaceShown) {
-                workspace.safeAreaInset(edge: .top, spacing: 0) {
+                VStack(spacing: 0) {
                     HStack {
                         Text("Цели").font(.headline)
                         Spacer()
                         Button("К чату") { workspaceShown = false }.frame(minHeight: 44)
                     }.padding(.horizontal, 20).background(Color(uiColor: .systemBackground))
+                    workspace
                 }.presentationDetents([.large])
             }
             .environment(scheduler)
