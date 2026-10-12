@@ -339,7 +339,7 @@ final class ConversationPasteView: UITextView {
 // iOS 17 keeps its original fallback; newer OS versions align short threads naturally.
 extension View {
     @ViewBuilder func conversationInitialScroll() -> some View {
-        if #available(iOS 18.0, *) { self.defaultScrollAnchor(.bottom, for: .initialOffset) }
+        if #available(iOS 18.0, *) { self.defaultScrollAnchor(.bottom).defaultScrollAnchor(.top, for: .alignment) }
         else { self.defaultScrollAnchor(.bottom) }
     }
 }
