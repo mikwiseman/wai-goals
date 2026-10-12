@@ -294,6 +294,12 @@ struct ConversationTextInput: UIViewRepresentable {
         view.textContainer.lineFragmentPadding = 0
         view.font = .preferredFont(forTextStyle: .body)
         view.adjustsFontForContentSizeCategory = true
+        // Preserve typed code, commands, quotes, and spacing exactly.
+        view.autocapitalizationType = .none
+        view.autocorrectionType = .no
+        view.smartQuotesType = .no
+        view.smartDashesType = .no
+        view.smartInsertDeleteType = .no
         view.isScrollEnabled = false
         view.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         view.accessibilityIdentifier = "conversation.composer"
