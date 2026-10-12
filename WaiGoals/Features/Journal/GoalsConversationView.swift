@@ -23,7 +23,7 @@ struct GoalsConversationView: View {
                     ScrollView {
                         LazyVStack(alignment: .leading, spacing: 18) {
                             if conversation.lines.isEmpty {
-                                ConversationWelcome(title: "Что для тебя сейчас важно?", subtitle: "Планы, итоги и движение к твоим целям.")
+                                ConversationWelcome(title: "Что хочешь сделать?", subtitle: "Планы, цели и итоги дня.")
                             }
                             if connection.aiAvailable == false {
                                 VStack(alignment: .leading, spacing: 12) {
@@ -41,7 +41,8 @@ struct GoalsConversationView: View {
                             Color.clear.frame(height: 1).id("bottom")
                         }.frame(maxWidth: 720).padding(.horizontal, 24).padding(.vertical, 16).frame(maxWidth: .infinity)
                     }
-                    .scrollDismissesKeyboard(.interactively)
+                    .conversationInitialScroll()
+                .scrollDismissesKeyboard(.interactively)
                     .onChange(of: conversation.lines.count) { _, _ in
                         withAnimation(reduceMotion ? nil : .easeOut(duration: 0.2)) { proxy.scrollTo("bottom", anchor: .bottom) }
                     }
@@ -52,7 +53,7 @@ struct GoalsConversationView: View {
             .background(Color(uiColor: .systemBackground))
             .safeAreaInset(edge: .bottom, spacing: 0) {
                 ConversationComposer(draft: $conversation.draft, voice: voice, busy: busy || readingPhoto,
-                                     hasAttachments: !conversation.photos.isEmpty, send: send) {
+                                     hasAttachments: !conversation.photos.isEmpty, send: send, pasteImages: pastePhotos) {
                     Button("Фото", systemImage: "photo") { photosShown = true }
                 } preview: {
                     if let data = conversation.photos.first {
@@ -68,7 +69,7 @@ struct GoalsConversationView: View {
                         if let onOpenWorkspace { Button("Цели и прогресс", systemImage: "scope") { voice.suspend(); onOpenWorkspace() } }
                         Button("Дневник", systemImage: "book.closed") { voice.suspend(); historyShown = true }
                         Button("Настройки", systemImage: "gearshape") { voice.suspend(); settingsShown = true }
-                    } label: { Image(systemName: "square.grid.2x2") }
+                    } label: { Image(systemName: "ellipsis") }
                         .accessibilityLabel("Цели, дневник и настройки").accessibilityIdentifier("conversation.workspace")
                 }
             }
@@ -96,6 +97,12 @@ struct GoalsConversationView: View {
             .onChange(of: conversation.draft) { _, _ in try? conversation.save() }
         }.tint(.primary)
     }
+    private func pastePhotos(_ images: [Data]) {
+        guard !busy, let raw = images.first, let image = conversationPhotoData(raw) else { return }
+        conversation.photos = [image]
+        try? conversation.save()
+    }
+
     private func send() {
         let draft = conversation.draft.trimmingCharacters(in: .whitespacesAndNewlines)
         let text = draft.isEmpty && !conversation.photos.isEmpty ? "Что на этом фото?" : draft
@@ -119,7 +126,7 @@ struct GoalsConversationView: View {
                 await voice.readReply(reply)
             } catch {
                 problem = "Ответ не завершён. Черновик сохранён; повтор использует тот же запрос."
-                voice.pause("Голос приостановлен. Можно продолжить текстом.")
+                voice.suspend()
             }
         }
     }

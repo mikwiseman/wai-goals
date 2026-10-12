@@ -1,5 +1,6 @@
 import SwiftUI
 import AVFoundation
+import UIKit
 
 /// Text, dictation and voice are three ways into the same conversation.
 struct ConversationComposer<Attachments: View, Preview: View>: View {
@@ -10,9 +11,11 @@ struct ConversationComposer<Attachments: View, Preview: View>: View {
     var allowsAttachments = true
     var placeholder = "Сообщение"
     var send: () -> Void
+    var pasteImages: (([Data]) -> Void)? = nil
     @ViewBuilder var attachments: () -> Attachments
     @ViewBuilder var preview: () -> Preview
-    @FocusState private var focused: Bool
+    @Environment(\.isEnabled) private var isEnabled
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var hasContent: Bool { hasAttachments || !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
@@ -23,61 +26,23 @@ struct ConversationComposer<Attachments: View, Preview: View>: View {
             if voice.live {
                 livePanel
             } else {
-                VStack(alignment: .leading, spacing: 4) {
-                    preview()
-                    ZStack(alignment: .leading) {
-                        TextField(placeholder, text: $draft, axis: .vertical)
-                            .font(.body)
-                            .lineLimit(1...6)
-                            .focused($focused)
-                            .padding(.horizontal, 12)
-                            .padding(.top, 12)
-                            .padding(.bottom, 6)
-                            .opacity(dictating ? 0 : 1)
-                            .accessibilityHidden(dictating)
-                            .disabled(busy || dictating)
-                            .accessibilityLabel("Сообщение")
-                            .accessibilityIdentifier("conversation.composer")
-                        if dictating { dictationPanel.padding(.horizontal, 12) }
+                VStack(alignment: .leading, spacing: 0) {
+                    if !busy { preview() }
+                    if dictating {
+                        dictationPanel.padding(.horizontal, 8)
+                    } else if dynamicTypeSize.isAccessibilitySize {
+                        editor.padding(.horizontal, 12)
+                        HStack(spacing: 0) { addButton; Spacer(minLength: 8); microphone; sendButton }
+                    } else {
+                        HStack(alignment: .bottom, spacing: 0) {
+                            addButton
+                            editor
+                            microphone
+                            sendButton
+                        }
                     }
-                    HStack(spacing: 8) {
-                        if allowsAttachments {
-                            Menu(content: attachments) {
-                                Image(systemName: "plus").frame(width: 44, height: 44)
-                            }
-                            .accessibilityLabel("Добавить вложение")
-                            .accessibilityIdentifier("conversation.attach")
-                            .disabled(busy || dictating)
-                        }
-                        Spacer(minLength: 0)
-                        Button { voice.toggleDictation() } label: {
-                            Image(systemName: voice.isRecording ? "stop.fill" : "mic")
-                                .frame(width: 44, height: 44)
-                        }
-                        .accessibilityLabel(voice.isRecording ? "Закончить диктовку" : "Надиктовать")
-                        .accessibilityHint("Речь добавляется в черновик. Отправка отдельной кнопкой.")
-                        .accessibilityIdentifier("conversation.dictation")
-                        .disabled(busy || voice.permissionPending || voice.phase == .transcribing)
-
-                        Button {
-                            focused = false
-                            if hasContent { send() } else { voice.toggleLive() }
-                        } label: {
-                            Image(systemName: hasContent ? "arrow.up" : "waveform")
-                                .font(.system(size: 18, weight: .semibold))
-                                .frame(width: 44, height: 44)
-                                .foregroundStyle(Color(uiColor: .systemBackground))
-                                .background(Color.primary, in: Circle())
-                        }
-                        .accessibilityLabel(hasContent ? "Отправить" : "Начать голосовой разговор")
-                        .accessibilityIdentifier(hasContent ? "conversation.send" : "conversation.live")
-                        .disabled(busy || dictating)
-                    }
-                    .font(.system(size: 20, weight: .medium))
-                    .buttonStyle(.plain)
-                    .padding(.horizontal, 6)
-                    .padding(.bottom, 6)
                 }
+                .padding(4)
                 .background(Color(uiColor: .secondarySystemBackground), in: RoundedRectangle(cornerRadius: 26))
                 .overlay(RoundedRectangle(cornerRadius: 26).strokeBorder(Color.primary.opacity(0.06)))
             }
@@ -109,6 +74,64 @@ struct ConversationComposer<Attachments: View, Preview: View>: View {
         }
     }
 
+    private var editor: some View {
+        ZStack(alignment: .leading) {
+            if busy || draft.isEmpty {
+                Text(placeholder)
+                    .font(.body).foregroundStyle(.secondary).allowsHitTesting(false)
+            }
+            ConversationTextInput(text: Binding(get: { busy ? "" : draft }, set: { if !busy { draft = $0 } }),
+                                  enabled: !busy && isEnabled, pasteImages: pasteImages)
+                .frame(minHeight: 44)
+        }.frame(maxWidth: .infinity)
+    }
+
+    @ViewBuilder private var addButton: some View {
+        if allowsAttachments {
+            Menu {
+                attachments()
+                Button("Голосовой разговор", systemImage: "waveform") { dismissKeyboard(); voice.toggleLive() }
+            } label: {
+                Image(systemName: "plus").font(.system(size: 20)).frame(width: 44, height: 44)
+            }
+            .accessibilityLabel("Добавить фото или открыть голосовой режим")
+            .accessibilityIdentifier("conversation.attach")
+            .disabled(busy)
+        }
+    }
+
+    private var microphone: some View {
+        Button { dismissKeyboard(); voice.toggleDictation() } label: {
+            Image(systemName: "mic").font(.system(size: 19)).frame(width: 44, height: 44)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Надиктовать")
+        .accessibilityHint("Речь добавится в черновик.")
+        .accessibilityIdentifier("conversation.dictation")
+        .disabled(busy || voice.permissionPending)
+    }
+
+    private var sendButton: some View {
+        Button {
+            dismissKeyboard()
+            if hasContent { send() } else { voice.toggleLive() }
+        } label: {
+            Image(systemName: hasContent && !busy ? "arrow.up" : "waveform")
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundStyle(Color(uiColor: .systemBackground))
+                .frame(width: 36, height: 36)
+                .background(Color.primary, in: Circle())
+                .frame(width: 44, height: 44)
+        }.buttonStyle(.plain)
+            .accessibilityLabel(hasContent ? "Отправить" : "Начать голосовой разговор")
+            .accessibilityIdentifier(hasContent ? "conversation.send" : "conversation.live")
+            .disabled(busy)
+    }
+
+    private func dismissKeyboard() {
+        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+    }
+
     private var dictationPanel: some View {
         HStack(spacing: 12) {
             if voice.isRecording { ConversationWave(level: voice.level) }
@@ -116,6 +139,11 @@ struct ConversationComposer<Attachments: View, Preview: View>: View {
             Text(voice.permissionPending ? "Включаю микрофон…" : voice.status)
                 .font(.subheadline).monospacedDigit()
             Spacer(minLength: 0)
+            if voice.isRecording {
+                Button { voice.toggleDictation() } label: {
+                    Image(systemName: "checkmark").frame(width: 44, height: 44)
+                }.accessibilityLabel("Закончить диктовку")
+            }
             Button { voice.cancelDictation() } label: {
                 Image(systemName: "xmark").frame(width: 44, height: 44)
             }.accessibilityLabel("Отменить диктовку")
@@ -174,11 +202,12 @@ struct ConversationWelcome: View {
     var title: String
     var subtitle: String
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text(title).font(.largeTitle.weight(.semibold)).tracking(-0.6)
-            Text(subtitle).font(.body).foregroundStyle(.secondary)
+        VStack(spacing: 8) {
+            Text(title).font(.title3.weight(.medium))
+            Text(subtitle).font(.subheadline).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
-        }.frame(maxWidth: .infinity, alignment: .leading).padding(.vertical, 44)
+        }.multilineTextAlignment(.center)
+            .frame(maxWidth: .infinity).padding(.vertical, 36)
     }
 }
 
@@ -197,13 +226,18 @@ struct ConversationPhotoPreview: View {
     var remove: () -> Void
     var body: some View {
         if let image = UIImage(data: data) {
-            HStack(spacing: 12) {
-                Image(uiImage: image).resizable().scaledToFill().frame(width: 64, height: 64)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                Text("Фото").font(.subheadline)
+            HStack {
+                ZStack(alignment: .topTrailing) {
+                    Image(uiImage: image).resizable().scaledToFill().frame(width: 60, height: 60)
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                    Button(action: remove) {
+                        Image(systemName: "xmark.circle.fill")
+                            .symbolRenderingMode(.palette)
+                            .foregroundStyle(Color.primary, Color(uiColor: .systemBackground))
+                            .frame(width: 44, height: 44)
+                    }.offset(x: 12, y: -12).accessibilityLabel("Убрать фото")
+                }
                 Spacer()
-                Button(action: remove) { Image(systemName: "xmark").frame(width: 44, height: 44) }
-                    .accessibilityLabel("Убрать фото")
             }.padding(12)
         }
     }
@@ -242,5 +276,70 @@ struct ConversationMessage: View {
                     .frame(maxWidth: isUser ? nil : .infinity, alignment: .leading)
             }
         }.frame(maxWidth: .infinity, alignment: isUser ? .trailing : .leading)
+    }
+}
+
+/// Native editing preserves newlines/code and supports an explicit Paste image action.
+struct ConversationTextInput: UIViewRepresentable {
+    @Binding var text: String
+    var enabled: Bool
+    var pasteImages: (([Data]) -> Void)?
+
+    func makeUIView(context: Context) -> ConversationPasteView {
+        let view = ConversationPasteView()
+        view.delegate = context.coordinator
+        view.backgroundColor = .clear
+        view.textColor = .label
+        view.textContainerInset = UIEdgeInsets(top: 11, left: 0, bottom: 11, right: 0)
+        view.textContainer.lineFragmentPadding = 0
+        view.font = .preferredFont(forTextStyle: .body)
+        view.adjustsFontForContentSizeCategory = true
+        view.isScrollEnabled = false
+        view.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        view.accessibilityIdentifier = "conversation.composer"
+        view.accessibilityLabel = "Сообщение"
+        return view
+    }
+    func updateUIView(_ view: ConversationPasteView, context: Context) {
+        context.coordinator.parent = self
+        if view.text != text { view.text = text }
+        view.isEditable = enabled
+        view.pasteImages = enabled ? pasteImages : nil
+    }
+    func sizeThatFits(_ proposal: ProposedViewSize, uiView: ConversationPasteView, context: Context) -> CGSize? {
+        guard let width = proposal.width else { return nil }
+        let height = uiView.sizeThatFits(CGSize(width: width, height: .greatestFiniteMagnitude)).height
+        let maximum = (uiView.font?.lineHeight ?? 22) * 5 + 22
+        uiView.isScrollEnabled = height > maximum
+        return CGSize(width: width, height: max(44, min(height, maximum)))
+    }
+    func makeCoordinator() -> Coordinator { Coordinator(self) }
+    final class Coordinator: NSObject, UITextViewDelegate {
+        var parent: ConversationTextInput
+        init(_ parent: ConversationTextInput) { self.parent = parent }
+        func textViewDidChange(_ textView: UITextView) { parent.text = textView.text; textView.invalidateIntrinsicContentSize() }
+    }
+}
+final class ConversationPasteView: UITextView {
+    var pasteImages: (([Data]) -> Void)?
+    var imagePasteboard: UIPasteboard = .general
+    override func paste(_ sender: Any?) {
+        if let pasteImages, imagePasteboard.hasImages {
+            let images = (imagePasteboard.images ?? []).compactMap { $0.jpegData(compressionQuality: 0.9) }
+            if !images.isEmpty { pasteImages(images); return }
+        }
+        super.paste(sender)
+    }
+    override func canPerformAction(_ action: Selector, withSender sender: Any?) -> Bool {
+        if action == #selector(paste(_:)), pasteImages != nil, imagePasteboard.hasImages { return true }
+        return super.canPerformAction(action, withSender: sender)
+    }
+}
+
+// iOS 17 keeps its original fallback; newer OS versions align short threads naturally.
+extension View {
+    @ViewBuilder func conversationInitialScroll() -> some View {
+        if #available(iOS 18.0, *) { self.defaultScrollAnchor(.bottom, for: .initialOffset) }
+        else { self.defaultScrollAnchor(.bottom) }
     }
 }
