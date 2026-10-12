@@ -13,46 +13,34 @@ struct GoalsConversationView: View {
     @State private var problem: String?
     @State private var historyShown = false
     @State private var settingsShown = false
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     var onOpenWorkspace: (() -> Void)?
     private var connection: GoalsConnection { .shared }
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                ScrollViewReader { proxy in
-                    ScrollView {
-                        LazyVStack(alignment: .leading, spacing: 18) {
-                            if conversation.lines.isEmpty {
-                                ConversationWelcome(title: "Что хочешь сделать?", subtitle: "Планы, цели и итоги дня.")
-                            }
-                            if connection.aiAvailable == false {
-                                VStack(alignment: .leading, spacing: 12) {
-                                    Text("В этом аккаунте AI пока не подключён. Цели и дневник уже доступны.")
-                                        .font(.subheadline).foregroundStyle(.secondary)
-                                    if let onOpenWorkspace {
-                                        Button("Открыть цели", action: onOpenWorkspace).frame(minHeight: 44)
-                                    }
-                                }
-                            }
-                            ForEach(conversation.lines) { line in
-                                ConversationMessage(text: line.text, isUser: line.role == "user", images: line.images ?? []).id(line.id)
-                            }
-                            if busy && !voice.live { ConversationProgress() }
-                            Color.clear.frame(height: 1).id("bottom")
-                        }.frame(maxWidth: 720).padding(.horizontal, 24).padding(.vertical, 16).frame(maxWidth: .infinity)
+                ConversationTimeline(revision: conversation.lines.count, sending: busy) {
+                    if conversation.lines.isEmpty {
+                        ConversationWelcome(title: "Что хочешь сделать?", subtitle: "Планы, цели и итоги дня.")
                     }
-                    .conversationInitialScroll()
-                .scrollDismissesKeyboard(.interactively)
-                    .onChange(of: conversation.lines.count) { _, _ in
-                        withAnimation(reduceMotion ? nil : .easeOut(duration: 0.2)) { proxy.scrollTo("bottom", anchor: .bottom) }
+                    if connection.aiAvailable == false {
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("В этом аккаунте AI пока не подключён. Цели и дневник уже доступны.")
+                                .font(.subheadline).foregroundStyle(.secondary)
+                            if let onOpenWorkspace {
+                                Button("Открыть цели", action: onOpenWorkspace).frame(minHeight: 44)
+                            }
+                        }
                     }
-                    .onAppear { proxy.scrollTo("bottom", anchor: .bottom) }
+                    ForEach(conversation.lines) { line in
+                        ConversationMessage(text: line.text, isUser: line.role == "user", images: line.images ?? []).id(line.id)
+                    }
+                    if busy && !voice.live { ConversationProgress() }
                 }
                 if let error = problem ?? conversation.storageError { Text(error).font(.caption).foregroundStyle(.secondary).padding(.horizontal, 16) }
             }
             .background(Color(uiColor: .systemBackground))
             .safeAreaInset(edge: .bottom, spacing: 0) {
-                ConversationComposer(draft: $conversation.draft, voice: voice, busy: busy || readingPhoto,
+                ConversationComposer(draft: $conversation.draft, voice: voice, busy: busy || readingPhoto, retrying: conversation.canRetry(context: conversation.pending?.context ?? TimeZone.current.identifier),
                                      hasAttachments: !conversation.photos.isEmpty, send: send, pasteImages: pastePhotos) {
                     Button("Фото", systemImage: "photo") { photosShown = true }
                 } preview: {
@@ -125,7 +113,7 @@ struct GoalsConversationView: View {
                 try conversation.complete(reply)
                 await voice.readReply(reply)
             } catch {
-                problem = "Ответ не завершён. Черновик сохранён; повтор использует тот же запрос."
+                problem = "Ответ не получен. Черновик сохранён. Можно повторить запрос."
                 voice.suspend()
             }
         }

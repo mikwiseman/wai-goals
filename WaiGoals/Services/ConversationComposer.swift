@@ -7,6 +7,7 @@ struct ConversationComposer<Attachments: View, Preview: View>: View {
     @Binding var draft: String
     @Bindable var voice: ConversationVoice
     var busy: Bool
+    var retrying = false
     var hasAttachments = false
     var allowsAttachments = true
     var placeholder = "Сообщение"
@@ -77,7 +78,7 @@ struct ConversationComposer<Attachments: View, Preview: View>: View {
     private var editor: some View {
         ZStack(alignment: .leading) {
             if busy || draft.isEmpty {
-                Text(placeholder)
+                Text(busy ? "Жду ответ…" : placeholder)
                     .font(.body).foregroundStyle(.secondary).allowsHitTesting(false)
             }
             ConversationTextInput(text: Binding(get: { busy ? "" : draft }, set: { if !busy { draft = $0 } }),
@@ -116,14 +117,14 @@ struct ConversationComposer<Attachments: View, Preview: View>: View {
             dismissKeyboard()
             if hasContent { send() } else { voice.toggleLive() }
         } label: {
-            Image(systemName: hasContent && !busy ? "arrow.up" : "waveform")
+            Image(systemName: busy ? "ellipsis" : hasContent ? (retrying ? "arrow.clockwise" : "arrow.up") : "waveform")
                 .font(.system(size: 17, weight: .semibold))
                 .foregroundStyle(Color(uiColor: .systemBackground))
                 .frame(width: 36, height: 36)
                 .background(Color.primary, in: Circle())
                 .frame(width: 44, height: 44)
         }.buttonStyle(.plain)
-            .accessibilityLabel(hasContent ? "Отправить" : "Начать голосовой разговор")
+            .accessibilityLabel(busy ? "Жду ответ" : hasContent ? (retrying ? "Повторить запрос" : "Отправить") : "Начать голосовой разговор")
             .accessibilityIdentifier(hasContent ? "conversation.send" : "conversation.live")
             .disabled(busy)
     }
@@ -269,13 +270,107 @@ struct ConversationMessage: View {
                             .accessibilityLabel("Отправленное фото")
                     }
                 }
-                Text(.init(text)).font(.body).textSelection(.enabled)
+                Text(conversationText(text, isUser: isUser)).font(.body).textSelection(.enabled)
                     .padding(isUser ? 14 : 0)
                     .background(isUser ? Color(uiColor: .secondarySystemBackground) : .clear,
                                 in: RoundedRectangle(cornerRadius: 20))
                     .frame(maxWidth: isUser ? nil : .infinity, alignment: .leading)
             }
         }.frame(maxWidth: .infinity, alignment: isUser ? .trailing : .leading)
+    }
+}
+
+/// User input is data, including literal Markdown and code. Replies retain inline
+/// formatting without collapsing paragraphs or line breaks.
+func conversationText(_ text: String, isUser: Bool) -> AttributedString {
+    if isUser { return AttributedString(text) }
+    return (try? AttributedString(markdown: text, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace))) ?? AttributedString(text)
+}
+
+/// Follow new answers until the reader deliberately moves away from the bottom.
+struct ConversationTimeline<Revision: Equatable, Content: View>: View {
+    var revision: Revision
+    var sending: Bool
+    @ViewBuilder var content: () -> Content
+    @State private var position = ConversationReadingPosition()
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        ScrollViewReader { proxy in
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 24) {
+                    content()
+                    Color.clear.frame(height: 1).id("conversation.bottom")
+                }.frame(maxWidth: 720).padding(.horizontal, 24).padding(.vertical, 16).frame(maxWidth: .infinity)
+            }
+            .conversationInitialScroll()
+            .scrollDismissesKeyboard(.interactively)
+            .modifier(ConversationReadingTracker(position: $position))
+            .overlay(alignment: .bottomTrailing) {
+                if !position.followsLatest {
+                    Button {
+                        position = ConversationReadingPosition()
+                        scroll(proxy)
+                    } label: {
+                        Image(systemName: "arrow.down").font(.body.weight(.semibold))
+                            .frame(width: 44, height: 44)
+                            .background(.regularMaterial, in: Circle())
+                            .overlay(Circle().strokeBorder(Color.primary.opacity(0.08)))
+                    }.buttonStyle(.plain).padding(16)
+                        .accessibilityLabel("К последнему сообщению")
+                        .accessibilityIdentifier("conversation.latest")
+                }
+            }
+            .onChange(of: revision) { _, _ in if position.shouldFollow { scroll(proxy) } }
+            .onChange(of: sending) { _, active in
+                if active { position = ConversationReadingPosition() }
+                if position.shouldFollow { scroll(proxy) }
+            }
+            .onAppear { proxy.scrollTo("conversation.bottom", anchor: .bottom) }
+        }
+    }
+
+    private func scroll(_ proxy: ScrollViewProxy) {
+        withAnimation(reduceMotion ? nil : .easeOut(duration: 0.2)) {
+            proxy.scrollTo("conversation.bottom", anchor: .bottom)
+        }
+    }
+}
+
+struct ConversationReadingPosition {
+    var followsLatest = true
+    var interacting = false
+    var shouldFollow: Bool { followsLatest && !interacting }
+
+    mutating func userMoved(nearBottom: Bool) {
+        if interacting { followsLatest = nearBottom }
+    }
+}
+
+private struct ConversationReadingTracker: ViewModifier {
+    @Binding var position: ConversationReadingPosition
+    @ViewBuilder func body(content: Content) -> some View {
+        if #available(iOS 18.0, *) {
+            content
+                .onScrollGeometryChange(for: Bool.self) { geometry in
+                    geometry.contentSize.height - geometry.contentOffset.y - geometry.containerSize.height < 80
+                } action: { _, nearBottom in
+                    position.userMoved(nearBottom: nearBottom)
+                }
+                .onScrollPhaseChange { _, phase, context in
+                    switch phase {
+                    case .tracking, .interacting, .decelerating:
+                        position.interacting = true
+                    case .idle:
+                        if position.interacting {
+                            let geometry = context.geometry
+                            position.userMoved(nearBottom: geometry.contentSize.height - geometry.contentOffset.y - geometry.containerSize.height < 80)
+                        }
+                        position.interacting = false
+                    default: break
+                    }
+                }
+        } else { content }
     }
 }
 

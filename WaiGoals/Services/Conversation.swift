@@ -37,6 +37,12 @@ final class Conversation {
         guard storageError == nil else { throw CocoaError(.fileReadCorruptFile) }
         try JSONEncoder().encode(Saved(lines: Array(lines.suffix(200)), draft: draft, pending: pending, photos: photos)).write(to: url, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
     }
+    func canRetry(context: String) -> Bool {
+        guard let pending else { return false }
+        let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
+        let message = text.isEmpty && !photos.isEmpty ? "Что на этом фото?" : text
+        return pending.text == message && pending.context == context && (pending.images ?? []) == photos
+    }
     func prepare(text: String, context: String, body: Data, images: [Data] = []) throws -> ConversationPending {
         if let pending, pending.text == text, pending.context == context, (pending.images ?? []) == images { try save(); return pending }
         let value = ConversationPending(id: UUID(), text: text, context: context, body: body, images: images)

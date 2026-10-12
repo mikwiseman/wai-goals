@@ -29,6 +29,9 @@ import XCTest
         let retryChat = Conversation(name: name)
         let retry = try retryChat.prepare(text: retryChat.draft, context: "today", body: Data("changed history".utf8), images: retryChat.photos)
         XCTAssertEqual(first.id, retry.id); XCTAssertEqual(first.body, retry.body)
+        XCTAssertTrue(retryChat.canRetry(context: "today"))
+        XCTAssertFalse(retryChat.canRetry(context: "another-client"))
+        retryChat.photos = []; XCTAssertFalse(retryChat.canRetry(context: "today")); retryChat.photos = [image]
         XCTAssertEqual(retryChat.lines.count, 1); XCTAssertEqual(retryChat.lines[0].images, [image])
         let replaced = try retryChat.prepare(text: retryChat.draft, context: "today", body: Data("second".utf8), images: [Data([255,216,255,1])])
         XCTAssertNotEqual(replaced.id, first.id)
