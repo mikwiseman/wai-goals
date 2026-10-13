@@ -97,7 +97,7 @@ struct ConversationComposer<Attachments: View, Preview: View>: View {
             } label: {
                 Image(systemName: "plus").font(.system(size: 20)).frame(width: 44, height: 44)
             }
-            .accessibilityLabel("Добавить фото или открыть голосовой режим")
+            .accessibilityLabel(allowsVoice ? "Добавить фото или открыть голосовой режим" : "Добавить фото")
             .accessibilityIdentifier("conversation.attach")
             .disabled(busy)
         }
