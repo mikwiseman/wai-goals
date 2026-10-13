@@ -1,6 +1,7 @@
 import Foundation
 import Observation
 import Security
+import CryptoKit
 
 @MainActor @Observable
 final class GoalsConnection {
@@ -18,6 +19,13 @@ final class GoalsConnection {
     var status: String?
     var aiAvailable: Bool?
     var lastSyncedAt: Date? = UserDefaults.standard.object(forKey: "goals.lastSyncedAt") as? Date
+    var accountIdentifier: String? { credential?.userId.map { (credential?.independent == true ? "goals:" : "legacy:") + $0 } }
+    var conversationName: String { Self.conversationName(for: accountIdentifier) }
+    static func conversationName(for accountID: String?) -> String {
+        guard let accountID else { return "goals-conversation-unclaimed" }
+        let key = SHA256.hash(data: Data(accountID.utf8)).map { String(format: "%02x", $0) }.joined()
+        return "goals-conversation-" + key
+    }
     var isConnected: Bool { credential != nil }
     var isLegacyConnection: Bool { credential != nil && credential?.independent != true }
     var mcpToken: String?
@@ -31,6 +39,27 @@ final class GoalsConnection {
             credential = try? JSONDecoder().decode(Credential.self,from:data)
             if credential?.independent == true { aiAvailable = false }
         }
+        if let directory = try? FileManager.default.url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true) {
+            let old = directory.appendingPathComponent("goals-conversation.json")
+            if FileManager.default.fileExists(atPath: old.path) {
+                var destination = directory.appendingPathComponent(conversationName + ".json")
+                if FileManager.default.fileExists(atPath: destination.path) { destination = directory.appendingPathComponent("goals-conversation-archive-" + UUID().uuidString + ".json") }
+                do { try FileManager.default.moveItem(at: old, to: destination) }
+                catch { status = "Не удалось открыть прежнюю историю. Исходный файл сохранён." }
+            }
+        }
+    }
+    func chatGPTConnection(method: String) async throws -> ChatGPTConnectionStatus {
+        guard let credential else { throw ConnectionError.unauthorized }
+        if credential.independent != true {
+            await refreshStatus()
+            return ChatGPTConnectionStatus(status: aiAvailable == true ? "connected" : "disconnected", aiAvailable: aiAvailable, voiceAvailable: aiAvailable, managed: false)
+        }
+        let data = try await request(path: credential.prefix + "/chatgpt", method: method, token: credential.token)
+        guard self.credential?.token == credential.token else { throw CancellationError() }
+        let result = try JSONDecoder().decode(ChatGPTConnectionStatus.self, from: data)
+        aiAvailable = result.canChat
+        return result
     }
     func sendCode(email: String) async -> Bool {
         guard !busy else { return false }

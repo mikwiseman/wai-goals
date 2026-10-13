@@ -1,7 +1,7 @@
 import Foundation
 
 enum AppTab: String, Hashable {
-    case today, journal, goals, stats
+    case today, journal, goals, stats, chat
 }
 
 /// Parses launch arguments used for development, screenshots, and (later) deep

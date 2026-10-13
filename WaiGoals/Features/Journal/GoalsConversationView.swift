@@ -4,7 +4,10 @@ import SwiftData
 
 struct GoalsConversationView: View {
     @Environment(\.modelContext) private var context
-    @State private var conversation = Conversation(name: "goals-conversation")
+    @State private var conversation = Conversation(name: GoalsConnection.shared.conversationName)
+    @State private var chatGPT = ChatGPTConnectionModel()
+    @State private var chatGPTShown = false
+    @Environment(\.scenePhase) private var scenePhase
     @State private var voice = ConversationVoice()
     @State private var busy = false
     @State private var photoItem: PhotosPickerItem?
@@ -13,24 +16,15 @@ struct GoalsConversationView: View {
     @State private var problem: String?
     @State private var historyShown = false
     @State private var settingsShown = false
-    var onOpenWorkspace: (() -> Void)?
     private var connection: GoalsConnection { .shared }
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
                 ConversationTimeline(revision: conversation.lines.count, sending: busy) {
-                    if conversation.lines.isEmpty {
+                    if chatGPT.canChat && conversation.lines.isEmpty {
                         ConversationWelcome(title: "Что хочешь сделать?", subtitle: "Планы, цели и итоги дня.")
                     }
-                    if connection.aiAvailable == false {
-                        VStack(alignment: .leading, spacing: 12) {
-                            Text("В этом аккаунте AI пока не подключён. Цели и дневник уже доступны.")
-                                .font(.subheadline).foregroundStyle(.secondary)
-                            if let onOpenWorkspace {
-                                Button("Открыть цели", action: onOpenWorkspace).frame(minHeight: 44)
-                            }
-                        }
-                    }
+                    if !chatGPT.canChat { ChatGPTConnectionPanel(model: chatGPT) }
                     ForEach(conversation.lines) { line in
                         ConversationMessage(text: line.text, isUser: line.role == "user", images: line.images ?? []).id(line.id)
                     }
@@ -41,26 +35,26 @@ struct GoalsConversationView: View {
             .background(Color(uiColor: .systemBackground))
             .safeAreaInset(edge: .bottom, spacing: 0) {
                 ConversationComposer(draft: $conversation.draft, voice: voice, busy: busy || readingPhoto, retrying: conversation.canRetry(context: conversation.pending?.context ?? TimeZone.current.identifier),
-                                     hasAttachments: !conversation.photos.isEmpty, send: send, pasteImages: pastePhotos) {
+                                     hasAttachments: !conversation.photos.isEmpty, allowsVoice: chatGPT.canUseVoice, allowsSend: chatGPT.canChat, send: send, pasteImages: pastePhotos) {
                     Button("Фото", systemImage: "photo") { photosShown = true }
                 } preview: {
                     if let data = conversation.photos.first {
                         ConversationPhotoPreview(data: data) { conversation.photos = []; try? conversation.save() }.disabled(busy)
                     }
                 }
-                .disabled(connection.aiAvailable == false)
             }
-            .navigationTitle("Goals").navigationBarTitleDisplayMode(.inline)
+            .navigationTitle("Codex").navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Menu {
-                        if let onOpenWorkspace { Button("Цели и прогресс", systemImage: "scope") { voice.suspend(); onOpenWorkspace() } }
+                        Button("ChatGPT", systemImage: "bubble.left") { voice.suspend(); chatGPTShown = true }
                         Button("Дневник", systemImage: "book.closed") { voice.suspend(); historyShown = true }
                         Button("Настройки", systemImage: "gearshape") { voice.suspend(); settingsShown = true }
                     } label: { Image(systemName: "ellipsis") }
-                        .accessibilityLabel("Цели, дневник и настройки").accessibilityIdentifier("conversation.workspace")
+                        .accessibilityLabel("Настройки чата").accessibilityIdentifier("conversation.settings")
                 }
             }
+            .sheet(isPresented: $chatGPTShown) { ChatGPTConnectionSheet(model: chatGPT) }
             .sheet(isPresented: $historyShown) { JournalView() }
             .sheet(isPresented: $settingsShown) { SettingsView() }
             .photosPicker(isPresented: $photosShown, selection: $photoItem, matching: .images)
@@ -84,6 +78,16 @@ struct GoalsConversationView: View {
             .onDisappear { voice.suspend(); try? conversation.save() }
             .onChange(of: conversation.draft) { _, _ in try? conversation.save() }
         }.tint(.primary)
+        .task(id: connection.accountIdentifier) {
+            let accountID = connection.accountIdentifier
+            chatGPT.configure(accountID: accountID) { method in
+                guard connection.accountIdentifier == accountID else { throw CancellationError() }
+                return try await connection.chatGPTConnection(method: method)
+            }
+            await chatGPT.refresh()
+        }
+        .onChange(of: scenePhase) { _, phase in if phase == .active { Task { await chatGPT.refresh() } } }
+        .onChange(of: problem) { _, value in if value != nil { Task { await chatGPT.refresh() } } }
     }
     private func pastePhotos(_ images: [Data]) {
         guard !busy, let raw = images.first, let image = conversationPhotoData(raw) else { return }
@@ -94,7 +98,7 @@ struct GoalsConversationView: View {
     private func send() {
         let draft = conversation.draft.trimmingCharacters(in: .whitespacesAndNewlines)
         let text = draft.isEmpty && !conversation.photos.isEmpty ? "Что на этом фото?" : draft
-        guard !busy, !readingPhoto, !voice.isRecording, !text.isEmpty || !conversation.photos.isEmpty else { return }
+        guard chatGPT.canChat, !busy, !readingPhoto, !voice.isRecording, !text.isEmpty || !conversation.photos.isEmpty else { return }
         busy = true; problem = nil
         Task {
             defer { busy = false }

@@ -10,12 +10,11 @@ struct RootView: View {
     @State private var coordinator = NotificationCoordinator()
     @State private var connection = GoalsConnection.shared
     @State private var didBootstrap = false
-    @State private var workspaceShown = false
     @State private var selection: AppTab = AppLaunch.initialTab
 
     var body: some View {
         Group {
-            if connection.isConnected { conversation }
+            if connection.isConnected { content }
             else { NavigationStack { GoalsConnectionView() } }
         }
         .preferredColorScheme(Appearance(rawValue: appearanceRaw)?.colorScheme)
@@ -25,23 +24,12 @@ struct RootView: View {
         }
     }
 
-    private var conversation: some View {
-        GoalsConversationView(onOpenWorkspace: { workspaceShown = true })
-            .environment(\.dynamicTypeSize, preferredDynamicTypeSize)
-            .sheet(isPresented: $workspaceShown) {
-                VStack(spacing: 0) {
-                    HStack {
-                        Text("Цели").font(.headline)
-                        Spacer()
-                        Button("К чату") { workspaceShown = false }.frame(minHeight: 44)
-                    }.padding(.horizontal, 20).background(Color(uiColor: .systemBackground))
-                    workspace
-                }.presentationDetents([.large])
-            }
+    private var content: some View {
+        workspace
             .environment(scheduler)
             .environment(coordinator)
             .onChange(of: coordinator.routeGoalID) { _, id in
-                if id != nil { selection = .today; workspaceShown = true }
+                if id != nil { selection = .today }
             }
             .onReceive(NotificationCenter.default.publisher(for: .goalsDidSave)) { _ in synchronize() }
             .onChange(of: scenePhase) { _, phase in if phase == .active { synchronize() } }
@@ -67,6 +55,11 @@ struct RootView: View {
             }
             Tab("Stats", systemImage: "chart.bar.xaxis", value: AppTab.stats) {
                 StatsView().environment(\.dynamicTypeSize, preferredDynamicTypeSize)
+            }
+            Tab("Чат", systemImage: "bubble.left", value: AppTab.chat) {
+                GoalsConversationView()
+                    .id(connection.accountIdentifier)
+                    .environment(\.dynamicTypeSize, preferredDynamicTypeSize)
             }
         }
         .dynamicTypeSize(.small ... .large)

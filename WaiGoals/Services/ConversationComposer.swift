@@ -10,6 +10,8 @@ struct ConversationComposer<Attachments: View, Preview: View>: View {
     var retrying = false
     var hasAttachments = false
     var allowsAttachments = true
+    var allowsVoice = true
+    var allowsSend = true
     var placeholder = "Сообщение"
     var send: () -> Void
     var pasteImages: (([Data]) -> Void)? = nil
@@ -91,7 +93,7 @@ struct ConversationComposer<Attachments: View, Preview: View>: View {
         if allowsAttachments {
             Menu {
                 attachments()
-                Button("Голосовой разговор", systemImage: "waveform") { dismissKeyboard(); voice.toggleLive() }
+                if allowsVoice { Button("Голосовой разговор", systemImage: "waveform") { dismissKeyboard(); voice.toggleLive() } }
             } label: {
                 Image(systemName: "plus").font(.system(size: 20)).frame(width: 44, height: 44)
             }
@@ -101,32 +103,32 @@ struct ConversationComposer<Attachments: View, Preview: View>: View {
         }
     }
 
-    private var microphone: some View {
-        Button { dismissKeyboard(); voice.toggleDictation() } label: {
+    @ViewBuilder private var microphone: some View {
+        if allowsVoice { Button { dismissKeyboard(); voice.toggleDictation() } label: {
             Image(systemName: "mic").font(.system(size: 19)).frame(width: 44, height: 44)
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Надиктовать")
         .accessibilityHint("Речь добавится в черновик.")
         .accessibilityIdentifier("conversation.dictation")
-        .disabled(busy || voice.permissionPending)
+        .disabled(busy || voice.permissionPending) }
     }
 
     private var sendButton: some View {
         Button {
             dismissKeyboard()
-            if hasContent { send() } else { voice.toggleLive() }
+            if hasContent { send() } else if allowsVoice { voice.toggleLive() }
         } label: {
-            Image(systemName: busy ? "ellipsis" : hasContent ? (retrying ? "arrow.clockwise" : "arrow.up") : "waveform")
+            Image(systemName: busy ? "ellipsis" : hasContent ? (retrying ? "arrow.clockwise" : "arrow.up") : (allowsVoice ? "waveform" : "arrow.up"))
                 .font(.system(size: 17, weight: .semibold))
                 .foregroundStyle(Color(uiColor: .systemBackground))
                 .frame(width: 36, height: 36)
                 .background(Color.primary, in: Circle())
                 .frame(width: 44, height: 44)
         }.buttonStyle(.plain)
-            .accessibilityLabel(busy ? "Жду ответ" : hasContent ? (retrying ? "Повторить запрос" : "Отправить") : "Начать голосовой разговор")
-            .accessibilityIdentifier(hasContent ? "conversation.send" : "conversation.live")
-            .disabled(busy)
+            .accessibilityLabel(busy ? "Жду ответ" : hasContent ? (retrying ? "Повторить запрос" : "Отправить") : (allowsVoice ? "Начать голосовой разговор" : "Отправить"))
+            .accessibilityIdentifier(hasContent || !allowsVoice ? "conversation.send" : "conversation.live")
+            .disabled(busy || !allowsSend || (!hasContent && !allowsVoice))
     }
 
     private func dismissKeyboard() {

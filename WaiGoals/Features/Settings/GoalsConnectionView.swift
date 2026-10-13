@@ -28,7 +28,7 @@ struct GoalsConnectionView: View {
                     if connection.aiAvailable == true {
                         LabeledContent("Assistant",value:"Connected")
                     } else if connection.aiAvailable == false {
-                        Text("AI and voice are not connected for this account. Goals, journal editing and sync are available.").font(.footnote).foregroundStyle(.secondary)
+                        Text("Connect your ChatGPT from the chat. Goals, journal editing and sync are already available.").font(.footnote).foregroundStyle(.secondary)
                     }
                     if let date=connection.lastSyncedAt {
                         LabeledContent("Last synced",value:date.formatted(date:.abbreviated,time:.shortened))
