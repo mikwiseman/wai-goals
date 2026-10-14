@@ -12,7 +12,8 @@ struct WaiGoalsApp: App {
                 Completion.self,
                 Intention.self,
                 AchievementUnlock.self,
-                JournalEntry.self
+                JournalEntry.self,
+                GoalsSyncMetadata.self
             )
         } catch {
             // Persistence is foundational; surface the failure loudly rather

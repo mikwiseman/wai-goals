@@ -8,6 +8,8 @@ final class Completion {
     var id: UUID = UUID()
     /// The day this completion belongs to, normalized to local start-of-day.
     var day: Date = Date.now
+    /// Calendar-day identity is stable when the device changes time zone.
+    var syncDay: String?
     var goal: Goal?
 
     init(id: UUID = UUID(), day: Date, goal: Goal? = nil) {

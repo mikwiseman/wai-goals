@@ -13,6 +13,10 @@ final class AchievementUnlock {
         self.achievementRawValue = achievement.rawValue
         self.unlockedAt = unlockedAt
     }
+    init(rawValue: String, unlockedAt: Date) {
+        self.achievementRawValue = rawValue
+        self.unlockedAt = unlockedAt
+    }
 
     var achievement: AchievementID? {
         AchievementID(rawValue: achievementRawValue)

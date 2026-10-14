@@ -112,7 +112,7 @@ struct GoalsConversationView: View {
                     guard let day = format.date(from: entry.period), format.string(from: day) == entry.period, entry.kind.periodKey(for: day) == entry.period else { throw CocoaError(.coderInvalidValue) }
                     try JournalEntry.save(kind: entry.kind, date: day, text: entry.text, context: context)
                     reply += "\n\nСохранено: " + entry.kind.title + " · " + entry.period
-                    await connection.sync(goals: context.allGoals(), journal: context.allJournalEntries())
+                    await connection.sync(context: context)
                 }
                 try conversation.complete(reply)
                 await voice.readReply(reply)

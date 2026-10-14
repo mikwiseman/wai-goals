@@ -10,6 +10,7 @@ struct RootView: View {
     @State private var coordinator = NotificationCoordinator()
     @State private var connection = GoalsConnection.shared
     @State private var didBootstrap = false
+    @State private var showingSyncConflict = false
     @State private var selection: AppTab = AppLaunch.initialTab
 
     var body: some View {
@@ -18,9 +19,11 @@ struct RootView: View {
             else { NavigationStack { GoalsConnectionView() } }
         }
         .preferredColorScheme(Appearance(rawValue: appearanceRaw)?.colorScheme)
+        .onChange(of:connection.syncConflict?.id) { _, id in if id != nil { showingSyncConflict=true } }
+        .sheet(isPresented:$showingSyncConflict) { GoalsSyncConflictView() }
         .task(id: connection.isConnected) {
             await connection.refreshStatus()
-            await connection.sync(goals: context.allGoals(), journal: context.allJournalEntries())
+            await connection.sync(context: context)
         }
     }
 
@@ -32,6 +35,10 @@ struct RootView: View {
                 if id != nil { selection = .today }
             }
             .onReceive(NotificationCenter.default.publisher(for: .goalsDidSave)) { _ in synchronize() }
+            .onReceive(NotificationCenter.default.publisher(for: .goalsDidSync)) { _ in
+                scheduler.reschedule(for: context.allGoals())
+                AchievementUnlockStore.reconcile(goals: context.allGoals(), context: context)
+            }
             .onChange(of: scenePhase) { _, phase in if phase == .active { synchronize() } }
             .task {
                 guard !didBootstrap else { return }
@@ -42,6 +49,12 @@ struct RootView: View {
                 await scheduler.refreshAuthorizationStatus()
                 scheduler.reschedule(for: context.allGoals())
                 synchronize()
+            }
+            .task {
+                while !Task.isCancelled {
+                    do { try await Task.sleep(for:.seconds(30)) } catch { return }
+                    if scenePhase == .active { await connection.sync(context:context) }
+                }
             }
     }
 
@@ -72,6 +85,6 @@ struct RootView: View {
     }
 
     private func synchronize() {
-        Task { await connection.sync(goals: context.allGoals(), journal: context.allJournalEntries()) }
+        Task { await connection.sync(context: context) }
     }
 }

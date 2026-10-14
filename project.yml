@@ -11,7 +11,7 @@ settings:
   base:
     SWIFT_VERSION: "6.0"
     MARKETING_VERSION: "1.0"
-    CURRENT_PROJECT_VERSION: "26"
+    CURRENT_PROJECT_VERSION: "27"
     DEVELOPMENT_TEAM: "R4A779QVVY"
     ENABLE_USER_SCRIPT_SANDBOXING: YES
     GCC_TREAT_WARNINGS_AS_ERRORS: NO
@@ -51,14 +51,28 @@ targets:
         GENERATE_INFOPLIST_FILE: YES
         PRODUCT_BUNDLE_IDENTIFIER: is.waiwai.goals.tests
 
+  WaiGoalsUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: WaiGoalsUITests
+    dependencies:
+      - target: WaiGoals
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: is.waiwai.goals.uitests
+
 schemes:
   WaiGoals:
     build:
       targets:
         WaiGoals: all
         WaiGoalsTests: [test]
+        WaiGoalsUITests: [test]
     test:
       targets:
         - WaiGoalsTests
+        - WaiGoalsUITests
     run:
       config: Debug

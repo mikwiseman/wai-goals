@@ -134,6 +134,12 @@ struct GoalListRow: View {
     var calendar: Calendar = .current
 
     var body: some View {
+        Group {
+            if goal.modelContext != nil && !goal.isDeleted { row }
+        }
+    }
+
+    @ViewBuilder private var row: some View {
         let tint = goal.accent.color
         HStack(spacing: Theme.Spacing.m) {
             GoalIcon(symbol: goal.symbol, accent: goal.accent, size: 40)

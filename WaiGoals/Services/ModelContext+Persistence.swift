@@ -47,3 +47,4 @@ extension ModelContext {
 }
 
 extension Notification.Name { static let goalsDidSave = Notification.Name("goals.didSave") }
+extension Notification.Name { static let goalsDidSync = Notification.Name("goals.didSync") }

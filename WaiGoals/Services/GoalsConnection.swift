@@ -2,6 +2,7 @@ import Foundation
 import Observation
 import Security
 import CryptoKit
+import SwiftData
 
 @MainActor @Observable
 final class GoalsConnection {
@@ -11,10 +12,21 @@ final class GoalsConnection {
         var bindingKey: String { independent == true ? "goals.independentAccountId" : "goals.boundAccountId" }
     }
     private let service = "is.waiwai.goals.connection"
-    private let origin = "https://money.waiwai.is"
+    private let origin: String = {
+        #if DEBUG && targetEnvironment(simulator)
+        // Acceptance tests can use only a loopback server in a separate simulator.
+        if let value=ProcessInfo.processInfo.environment["WAI_GOALS_QA_ORIGIN"],
+           let url=URL(string:value),url.scheme == "http",url.host == "127.0.0.1" { return value }
+        #endif
+        return "https://money.waiwai.is"
+    }()
     private var credential: Credential?
     private var pending: Data?
     private var syncing = false
+    private var syncAgain = false
+    var syncConflict: GoalsSyncConflict?
+    private var conflictBase: GoalsSyncDocument?
+    private var conflictRemote: GoalsSyncResponse?
     var busy = false
     var status: String?
     var aiAvailable: Bool?
@@ -31,7 +43,7 @@ final class GoalsConnection {
     var mcpToken: String?
     struct MCPAccess: Decodable, Identifiable { let id: String; let name: String }
     var mcpAccess: [MCPAccess] = []
-    let mcpURL = "https://money.waiwai.is/api/goals/mcp"
+    var mcpURL: String { origin + "/api/goals/mcp" }
     private init() {
         var result: CFTypeRef?
         let query: [String:Any] = [kSecClass as String:kSecClassGenericPassword,kSecAttrService as String:service,kSecReturnData as String:true,kSecMatchLimit as String:kSecMatchLimitOne]
@@ -69,7 +81,7 @@ final class GoalsConnection {
             return true
         } catch { status=error.localizedDescription;return false }
     }
-    func connect(email: String, password: String = "", name: String? = nil, code: String? = nil, goals: [Goal], journal: [JournalEntry] = []) async {
+    func connect(email: String, password: String = "", name: String? = nil, code: String? = nil, context: ModelContext) async {
         guard !busy, !syncing, !isConnected || isLegacyConnection else { return }
         busy=true;status=nil;defer{busy=false}
         do {
@@ -105,7 +117,7 @@ final class GoalsConnection {
             credential=value;aiAvailable=false;lastSyncedAt=nil
             UserDefaults.standard.set(userId,forKey:value.bindingKey)
             UserDefaults.standard.set(deviceId.uuidString,forKey:"goals.deviceId")
-            await sync(goals:goals,journal:journal,force:true)
+            await sync(context:context,force:true)
             if let previous, previous.independent != true, lastSyncedAt != nil {
                 _ = try? await request(path:previous.prefix+"/connection",method:"DELETE",token:previous.token,body:JSONSerialization.data(withJSONObject:["deviceId":previous.deviceId.uuidString]))
             }
@@ -121,11 +133,15 @@ final class GoalsConnection {
             UserDefaults.standard.set(userId,forKey:credential.bindingKey)
         } catch { /* A temporary status failure must not sign out a valid session. */ }
     }
-    func sync(goals: [Goal], journal: [JournalEntry] = [], force: Bool = false) async {
+    func sync(context: ModelContext, force: Bool = false) async {
         guard !busy || force else { return }
         guard let connection=credential else { return }
         if UserDefaults.standard.string(forKey:connection.bindingKey) == nil { await refreshStatus() }
-        do { pending=try GoalsSnapshot.make(goals:goals,deviceId:connection.deviceId, journal:journal) }
+        if connection.independent == true {
+            await syncAccount(context:context,connection:connection)
+            return
+        }
+        do { pending=try GoalsSnapshot.make(goals:context.fetch(FetchDescriptor<Goal>()),deviceId:connection.deviceId, journal:context.fetch(FetchDescriptor<JournalEntry>())) }
         catch { status="Could not prepare your goals for syncing.";return }
         guard !syncing else { return }
         syncing=true
@@ -144,6 +160,73 @@ final class GoalsConnection {
                 return
             } catch { status="Not synced. \(error.localizedDescription)"; return }
         }
+    }
+    private func syncAccount(context: ModelContext, connection: Credential) async {
+        guard syncConflict == nil else { return }
+        guard !syncing else { syncAgain=true; return }
+        syncing=true; defer { syncing=false }
+        do {
+            guard let accountID=connection.userId else { throw ConnectionError.unauthorized }
+            let session=try GoalsSyncSession(context:context,accountID:accountID,deviceID:connection.deviceId)
+            for _ in 0..<4 {
+                syncAgain=false
+                let pending=try session.prepare()
+                let response: GoalsSyncResponse
+                do {
+                    response=try GoalsSyncCoding.decoder().decode(GoalsSyncResponse.self,from:await request(path:connection.prefix+"/sync",method:"POST",token:connection.token,body:GoalsSyncCoding.encoder().encode(pending.request)))
+                } catch ConnectionError.conflict {
+                    let remote=try await fetchSync(connection)
+                    let base=try session.baseline()
+                    if try showConflict(base:base,remote:remote,context:context) { return }
+                    // A fresh pull may already contain the requested result. Rebase without dropping local edits.
+                    try session.resolve(remote,base:base,preferLocal:false)
+                    continue
+                }
+                guard credential?.token == connection.token else { return }
+                do { try session.accept(response,pending:pending) }
+                catch let conflict as GoalsSyncConflict {
+                    syncConflict=conflict; conflictBase=pending.local; conflictRemote=response; status=conflict.localizedDescription
+                    return
+                }
+                lastSyncedAt=session.metadata.lastSyncedAt
+                UserDefaults.standard.set(lastSyncedAt,forKey:"goals.lastSyncedAt")
+                status=nil
+                NotificationCenter.default.post(name:.goalsDidSync,object:nil)
+                let remaining=try GoalsSyncDocument.capture(context).changes(since:session.baseline())
+                if remaining.isEmpty && !syncAgain && pending.request.lastAppliedRevision == response.revision { return }
+            }
+        } catch ConnectionError.unauthorized {
+            clearCredential(); status="Connection expired. Sign in again to resume syncing. Your goals and queued changes are safe on this device."
+        } catch { status="Not synced. \(error.localizedDescription)" }
+    }
+    private func fetchSync(_ connection: Credential) async throws -> GoalsSyncResponse {
+        let data=try await request(path:connection.prefix+"/sync",method:"GET",token:connection.token)
+        guard credential?.token == connection.token else { throw CancellationError() }
+        return try GoalsSyncCoding.decoder().decode(GoalsSyncResponse.self,from:data)
+    }
+    private func showConflict(base: GoalsSyncDocument, remote: GoalsSyncResponse, context: ModelContext) throws -> Bool {
+        do { _ = try GoalsSyncDocument.merge(base:base,local:GoalsSyncDocument.capture(context),remote:remote.state); return false }
+        catch let conflict as GoalsSyncConflict {
+            conflictBase=base; conflictRemote=remote; syncConflict=conflict; status=conflict.localizedDescription; return true
+        }
+    }
+    func resolveSyncConflict(context: ModelContext, preferLocal: Bool) async {
+        guard let connection=credential, let accountID=connection.userId, let base=conflictBase,
+              let displayed=conflictRemote, !busy, !syncing else { return }
+        busy=true
+        do {
+            let latest=try await fetchSync(connection)
+            if latest.revision != displayed.revision {
+                if try showConflict(base:base,remote:latest,context:context) {
+                    status="The server changed again. Review the latest versions before choosing."; busy=false; return
+                }
+            }
+            let session=try GoalsSyncSession(context:context,accountID:accountID,deviceID:connection.deviceId)
+            try session.resolve(latest,base:base,preferLocal:preferLocal)
+            syncConflict=nil; conflictBase=nil; conflictRemote=nil; status=nil
+            busy=false
+            await sync(context:context)
+        } catch { status=error.localizedDescription; busy=false }
     }
     func disconnect() async {
         guard let connection=credential,!busy,!syncing else { return }
@@ -201,11 +284,11 @@ final class GoalsConnection {
         do { mcpAccess=try JSONDecoder().decode([MCPAccess].self,from:await request(path:credential.prefix+"/tokens",method:"GET",token:credential.token)) }
         catch { status=error.localizedDescription }
     }
-    func createMCPAccess() async {
+    func createMCPAccess(canWrite: Bool = false) async {
         guard let credential, credential.independent == true,!busy else { return }
         busy=true;status=nil;defer{busy=false}
         do {
-            let data=try await request(path:credential.prefix+"/tokens",method:"POST",token:credential.token,body:JSONSerialization.data(withJSONObject:["name":"Dots"]))
+            let data=try await request(path:credential.prefix+"/tokens",method:"POST",token:credential.token,body:JSONSerialization.data(withJSONObject:["name":"Assistant","scopes":canWrite ? ["goals:read","goals:write"] : ["goals:read"]]))
             mcpToken=(try JSONSerialization.jsonObject(with:data) as? [String:Any])?["token"] as? String
             await loadMCPAccess()
         } catch { status=error.localizedDescription }
@@ -232,6 +315,7 @@ final class GoalsConnection {
         if let credential { UserDefaults.standard.set(credential.deviceId.uuidString, forKey: "goals.deviceId") }
         SecItemDelete([kSecClass as String:kSecClassGenericPassword,kSecAttrService as String:service] as CFDictionary)
         credential=nil;pending=nil;lastSyncedAt=nil;aiAvailable=nil;mcpToken=nil;mcpAccess=[]
+        syncConflict=nil;conflictBase=nil;conflictRemote=nil
         UserDefaults.standard.removeObject(forKey:"goals.lastSyncedAt")
     }
     private func request(path:String,method:String,token:String?=nil,body:Data?=nil, contentType:String="application/json", timeout:TimeInterval=30, requestId:UUID?=nil) async throws -> Data {
@@ -246,6 +330,7 @@ final class GoalsConnection {
         guard let http=response as? HTTPURLResponse else { throw URLError(.badServerResponse) }
         guard (200..<300).contains(http.statusCode) else {
             if http.statusCode==401 { throw ConnectionError.unauthorized }
+            if http.statusCode==409 && path.hasSuffix("/sync") { throw ConnectionError.conflict }
             if let object = try? JSONSerialization.jsonObject(with:data) as? [String:Any], let message = (object["error"] as? String) ?? (object["message"] as? String), http.statusCode < 500 {
                 throw ConnectionError.message(String(message.prefix(300)))
             }
@@ -255,10 +340,12 @@ final class GoalsConnection {
     }
     private enum ConnectionError: LocalizedError {
         case unauthorized
+        case conflict
         case message(String)
         var errorDescription:String? {
             switch self {
             case .unauthorized: "Sign-in was not accepted. Check your email and password."
+            case .conflict: "Sync needs a choice. Your changes are saved on this device."
             case .message(let text): text
             }
         }

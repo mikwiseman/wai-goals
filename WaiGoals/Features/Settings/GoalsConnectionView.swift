@@ -12,6 +12,8 @@ struct GoalsConnectionView: View {
     @State private var mode = Mode.email
     @State private var migrating = false
     @State private var confirmingDelete = false
+    @State private var showingSyncConflict = false
+    @State private var mcpCanWrite = false
     private enum Mode { case email, code, password, create }
     var body: some View {
         Form {
@@ -33,10 +35,13 @@ struct GoalsConnectionView: View {
                     if let date=connection.lastSyncedAt {
                         LabeledContent("Last synced",value:date.formatted(date:.abbreviated,time:.shortened))
                     }
-                    Button("Sync now") { Task { await connection.sync(goals:context.allGoals(),journal:context.allJournalEntries()) } }
+                    Button("Sync now") { Task { await connection.sync(context:context) } }
+                    if connection.syncConflict != nil {
+                        Button("Review sync changes") { showingSyncConflict=true }
+                    }
                     Button("Sign out",role:.destructive) { Task { await connection.disconnect() } }.disabled(connection.busy)
                 } footer: {
-                    Text("Signing out removes this device’s synced copy from the server. Your goals stay on this device and remain linked to this account.")
+                    Text("Signing out disconnects this device. Your local goals and queued changes stay here; your account’s synced history stays on the server.")
                 }
                 if connection.isLegacyConnection {
                     Section {
@@ -48,7 +53,8 @@ struct GoalsConnectionView: View {
                     Section {
                         Text(connection.mcpURL).font(.caption).textSelection(.enabled)
                         Button("Copy server address") { UIPasteboard.general.string=connection.mcpURL }
-                        Button("Create access key") { Task { await connection.createMCPAccess() } }.disabled(connection.busy)
+                        Toggle("Allow goal and journal changes",isOn:$mcpCanWrite)
+                        Button("Create access key") { Task { await connection.createMCPAccess(canWrite:mcpCanWrite) } }.disabled(connection.busy)
                         if let token=connection.mcpToken {
                             Button("Copy new key") { UIPasteboard.general.setItems([[UIPasteboard.typeAutomatic:token]],options:[.localOnly:true,.expirationDate:Date.now.addingTimeInterval(120)]) }
                             Text("The key is shown only during this visit. Copy it into your MCP client.").font(.footnote).foregroundStyle(.secondary)
@@ -60,7 +66,7 @@ struct GoalsConnectionView: View {
                                 Button("Revoke",role:.destructive) { Task { await connection.revokeMCPAccess(id:access.id) } }.disabled(connection.busy)
                             }
                         }
-                    } header: { Text("MCP") } footer: { Text("An access key lets Dots read your synced goals and journal. Revoke it here at any time.") }
+                    } header: { Text("MCP") } footer: { Text("Connect this address and key in Codex, Dots or OpenStrudel. The key can read your goals and journal; changes require the option above. Revoke it here at any time.") }
                     Section {
                         SecureField("Password, if you use one",text:$password).textContentType(.password)
                         Button("Delete Goals account",role:.destructive) { confirmingDelete=true }.disabled(connection.busy)
@@ -83,7 +89,7 @@ struct GoalsConnectionView: View {
                             if mode == .email {
                                 if await connection.sendCode(email:email) { code="";mode = .code }
                             } else {
-                                await connection.connect(email:email,password:password,name:mode == .create ? name : nil,code:mode == .code ? code : nil,goals:context.allGoals(),journal:context.allJournalEntries())
+                                await connection.connect(email:email,password:password,name:mode == .create ? name : nil,code:mode == .code ? code : nil,context:context)
                                 if connection.isConnected && !connection.isLegacyConnection { password="";code="";migrating=false;await connection.loadMCPAccess() }
                             }
                         }
@@ -109,6 +115,7 @@ struct GoalsConnectionView: View {
             }
         }
         .task { await connection.refreshStatus();await connection.loadMCPAccess() }
+        .sheet(isPresented:$showingSyncConflict) { GoalsSyncConflictView() }
         .onDisappear { connection.mcpToken=nil;password="";code="" }
         .confirmationDialog("Delete your Goals account and all server data?",isPresented:$confirmingDelete,titleVisibility:.visible) {
             Button("Delete account",role:.destructive) { Task { await connection.deleteAccount(password:password);password="" } }

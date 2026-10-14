@@ -101,9 +101,8 @@ end
 platform :ios do
   desc "Archive the current project.yml version; optionally upload to TestFlight"
   lane :release_testflight do |options|
-    sh(File.expand_path("~/.local/bin/wai-signing"), "prepare", "ios")
-    release_keychain = File.expand_path("~/.appstoreconnect/aigid-appstore.keychain-db")
-    UI.user_error!("Missing documented iOS signing keychain") unless File.file?(release_keychain)
+    # Use the configured macOS signing identities and keychain search list.
+    # Do not require a machine-specific AiGid helper or duplicate signing keys.
     root = File.expand_path("..", __dir__)
     app_name = "WaiGoals"
     bundle_id = "is.waiwai.goals"
@@ -128,7 +127,7 @@ platform :ios do
       build_app(
         project: project_path, scheme: app_name, configuration: "Release", clean: true,
         derived_data_path: File.expand_path("~/Library/Caches/WaiSuiteBuilds/Goals"),
-        export_method: "app-store", xcargs: "COMPILER_INDEX_STORE_ENABLE=NO OTHER_CODE_SIGN_FLAGS=\"--keychain #{release_keychain}\"",
+        export_method: "app-store", xcargs: "COMPILER_INDEX_STORE_ENABLE=NO",
         export_options: { method: "app-store", signingStyle: "manual", teamID: "R4A779QVVY",
           signingCertificate: "Apple Distribution", provisioningProfiles: { bundle_id => profile.fetch("Name") } },
         output_directory: File.join(root, "build", "export"), output_name: "#{app_name}.ipa"

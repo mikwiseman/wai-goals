@@ -39,6 +39,7 @@ extension Goal {
         let day = calendar.startOfDay(for: date)
 
         if let existing = completions.first(where: { calendar.isDate($0.day, inSameDayAs: day) }) {
+            completions.removeAll { $0.id == existing.id }
             context.delete(existing)
             context.saveOrLog()
             return nil
@@ -46,6 +47,7 @@ extension Goal {
 
         let completion = Completion(day: day, goal: self)
         context.insert(completion)
+        if !completions.contains(where: { $0.id == completion.id }) { completions.append(completion) }
         context.saveOrLog()
 
         // Compute the streak from an explicit day set so we don't depend on the

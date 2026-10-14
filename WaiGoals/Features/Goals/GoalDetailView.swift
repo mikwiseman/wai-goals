@@ -19,6 +19,15 @@ struct GoalDetailView: View {
     private var today: Date { calendar.startOfDay(for: .now) }
 
     var body: some View {
+        Group {
+            if goal.modelContext != nil && !goal.isDeleted { detail }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .goalsDidSync)) { _ in
+            if goal.modelContext == nil || goal.isDeleted { dismiss() }
+        }
+    }
+
+    @ViewBuilder private var detail: some View {
         let tint = goal.accent.color
         let streak = goal.streak(asOf: today, calendar: calendar)
         let completed = goal.completedDays(calendar: calendar)

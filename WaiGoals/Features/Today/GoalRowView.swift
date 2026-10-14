@@ -25,6 +25,12 @@ struct TodayGoalRow: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
+        Group {
+            if goal.modelContext != nil && !goal.isDeleted { row }
+        }
+    }
+
+    @ViewBuilder private var row: some View {
         let tint = goal.accent.color
         let streak = goal.streak(asOf: day, calendar: calendar)
         HStack(

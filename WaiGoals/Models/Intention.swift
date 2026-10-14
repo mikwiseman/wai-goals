@@ -10,6 +10,7 @@ final class Intention {
     var id: UUID = UUID()
     /// The day this intention belongs to, normalized to local start-of-day.
     var day: Date = Date.now
+    var syncDay: String?
     /// Retained only so older TestFlight data can migrate cleanly.
     var cueRaw: String = ""
     var approvedAt: Date = Date.now
